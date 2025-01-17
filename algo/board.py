@@ -2,11 +2,7 @@ import numpy as np
 
 import math
 from typing import Optional
-from abc import ABC, abstractmethod
-
-
-class Player(ABC):
-	pass
+from iplayer import IPlayer
 
 class Board():
 	SIZE = 6
@@ -16,6 +12,9 @@ class Board():
 		[1, 1],
 		[-1, 1]
 	])
+	__invalid_board = np.array(
+		[[False] * SIZE] * SIZE
+	)
 
 	@classmethod
 	def __direction_index(cls, direction: np.ndarray) -> int:
@@ -24,7 +23,7 @@ class Board():
 				return i
 		raise ValueError("Invalid direction")
 
-	def __init__(self, positive_player: Player, negative_player: Player) -> None:
+	def __init__(self, positive_player: IPlayer, negative_player: IPlayer) -> None:
 		self.__positive_player = positive_player
 		self.__negative_player = negative_player
 
@@ -74,14 +73,17 @@ class Board():
 			if self.__empty(next_next_pos) and self.__enemy(pos, next_pos):
 				return True
 	
+	def __get_simple_directions(self, sign: int) -> np.ndarray:
+		if sign > 0:
+			return self.__directions[:2]
+		else:
+			return self.__directions[2:]
+	
 	def __on_board_update(self) -> None:
 		# Determine if a player should capture
 		should_capture = {-1: False, 1: False}
 		for sign in [-1, 1]:
-			if sign > 0:
-				simple_directions = self.__directions[:2]
-			else:
-				simple_directions = self.__directions[2:]
+			simple_directions = self.__get_simple_directions(sign)
 
 			for y in range(6):
 				if should_capture[sign]:
@@ -112,11 +114,7 @@ class Board():
 
 	
 	def is_move_correct(self, start: np.ndarray, end: np.ndarray) -> bool:
-		if self.__invalid(start) or self.__invalid(end) or not self.__empty(end):
-			return False
-		
-		piece = self.__board[*start]
-		if piece == 0:
+		if self.__invalid(start) or self.__empty(start) or self.__invalid(end) or not self.__empty(end):
 			return False
 		
 		# Diagonality check
@@ -125,6 +123,7 @@ class Board():
 			return False
 		
 		direction = np.sign(delta)
+		piece = self.__board[*start]
 		t = abs(piece)
 		sign = np.sign(piece)
 
@@ -164,9 +163,60 @@ class Board():
 			
 			return found_enemy == self.__check_should_capture(sign) # type: ignore
 
-		
 		raise ValueError("Invalid piece on the board!")
 
+	def get_correct_moves(self, start: np.ndarray) -> np.ndarray:
+		ret = self.__invalid_board.copy()
+		if self.__invalid(start) or self.__empty(start):
+			return ret
+		
+		piece = self.__board[*start]
+		t = abs(piece)
+		sign = np.sign(piece)
+
+		# Simple piece
+		if t == 1:
+			for direction in self.__get_simple_directions(sign): # type: ignore
+				next_pos = start + direction
+				if self.__invalid(next_pos):
+					continue
+
+				# Simple move
+				if self.__empty(next_pos):
+					ret[*next_pos] = True
+					continue
+
+				# Capture move
+				next_next_pos = next_pos + direction
+				if not self.__enemy(start, next_pos) or self.__invalid(next_next_pos) or not self.__empty(next_next_pos):
+					continue
+				ret[*next_next_pos] = True
+			
+			return ret
+		
+		# King piece
+		elif t == 2:
+			for direction in self.__directions:
+				cur_pos = start
+				found_enemy = False
+				while True:
+					cur_pos += direction
+					if self.__invalid(cur_pos):
+						break
+
+					if self.__empty(cur_pos):
+						ret[*cur_pos] = True
+						continue
+					
+					if self.__enemy(start, cur_pos):
+						if found_enemy:
+							break
+						found_enemy = True
+						continue
+			
+			return ret
+
+		raise ValueError("Invalid piece on the board!")
 	
 	def __str__(self) -> str:
 		ret = ""
