@@ -2,7 +2,6 @@ import numpy as np
 
 import math
 from typing import Optional
-from iplayer import IPlayer
 
 class Board():
 	SIZE = 6
@@ -23,10 +22,7 @@ class Board():
 				return i
 		raise ValueError("Invalid direction")
 
-	def __init__(self, positive_player: IPlayer, negative_player: IPlayer) -> None:
-		self.__positive_player = positive_player
-		self.__negative_player = negative_player
-
+	def __init__(self) -> None:
 		self.__board = np.array([
 			[-1, 0, -1, 0, -1, 0],
 			[0, -1, 0, -1, 0, -1],
@@ -38,8 +34,9 @@ class Board():
 
 		self.__positive_should_capture = False
 		self.__negative_should_capture = False
+		self.__enable_update_should_capture = True
 
-	def __check_should_capture(self, sign: int) -> bool:
+	def check_should_capture(self, sign: int) -> bool:
 		if sign > 0:
 			return self.__positive_should_capture
 		else:
@@ -79,7 +76,7 @@ class Board():
 		else:
 			return self.__directions[2:]
 	
-	def __on_board_update(self) -> None:
+	def __update_should_capture(self) -> None:
 		# Determine if a player should capture
 		should_capture = {-1: False, 1: False}
 		for sign in [-1, 1]:
@@ -137,7 +134,7 @@ class Board():
 			# Non-capture move
 			next_pos = start + direction
 			if next_pos == end:
-				return self.__check_should_capture(sign) # type: ignore
+				return self.check_should_capture(sign) # type: ignore
 			
 			# Capture move
 			next_next_pos = next_pos + direction
@@ -161,7 +158,7 @@ class Board():
 				
 				found_enemy = True
 			
-			return found_enemy == self.__check_should_capture(sign) # type: ignore
+			return found_enemy == self.check_should_capture(sign) # type: ignore
 
 		raise ValueError("Invalid piece on the board!")
 
@@ -218,6 +215,54 @@ class Board():
 
 		raise ValueError("Invalid piece on the board!")
 	
+	def make_move(self, start: np.ndarray, end: np.ndarray) -> None:
+		"""
+		**Warning**: No checks are performed!
+
+		Would update the board state, check if the piece should be promoted or capture again
+		"""
+		self.__board[*end] = self.__board[*start]
+		self.__board[*start] = 0
+
+		# Check if the piece should be promoted
+		if end[1] == 0 and self.__board[*end] == 1:
+			self.__board[*end] = 2
+		elif end[1] == self.SIZE - 1 and self.__board[*end] == -1:
+			self.__board[*end] = -2
+		
+		# Check if the piece should capture again
+		if self.__enable_update_should_capture:
+			self.__update_should_capture()
+
+	def is_game_over(self, turn_sign: int) -> Optional[int]:
+		"""
+		Returns:
+			1 if positive player wins, -1 if negative player wins, 0 if the game is not over
+		"""
+		turns_pieces = []
+		not_turn_has_pieces = False
+		for x in range(6):
+			for y in range(6):
+				sign = np.sign(self.__board[x, y])
+				if sign == turn_sign:
+					turns_pieces.append(np.array([x, y]))
+				elif sign != 0:
+					not_turn_has_pieces = True
+		
+		if not turns_pieces:
+			return -turn_sign
+		elif not not_turn_has_pieces:
+			return turn_sign
+		
+		for pos in turns_pieces[sign]:
+			if any(self.get_correct_moves(pos)):
+				return None
+		return -turn_sign
+
+
+	def get_board(self) -> np.ndarray:
+		return self.__board.copy()
+
 	def __str__(self) -> str:
 		ret = ""
 		for row in self.__board:
