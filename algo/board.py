@@ -1,36 +1,58 @@
 import numpy as np
 
-import math
+from dataclasses import dataclass
 from typing import Optional
+
+def _s(x: int) -> int:
+	if x > 0:
+		return 1
+	elif x < 0:
+		return -1
+	return 0
+
+@dataclass
+class _c:
+	x: int
+	y: int
+
+	def s(self) -> '_c':
+		return _c(_s(self.x), _s(self.y))
+
+	def __add__(self, other: '_c') -> '_c':
+		return _c(self.x + other.x, self.y + other.y)
+	
+	def __sub__(self, other: '_c') -> '_c':
+		return _c(self.x - other.x, self.y - other.y)
+	
+	def __getitem__(self, index: int) -> int:
+		if index == 0:
+			return self.x
+		elif index == 1:
+			return self.y
+		raise IndexError("Invalid index")
 
 class Board():
 	SIZE = 6
-	__directions = np.array([
-		[-1, -1],
-		[1, -1],
-		[1, 1],
-		[-1, 1]
-	])
+	__directions = [
+		_c(-1, -1),
+		_c(1, -1),
+		_c(1, 1),
+		_c(-1, 1)
+	]
 	__invalid_board = np.array(
-		[[False] * SIZE] * SIZE
-	)
-
-	@classmethod
-	def __direction_index(cls, direction: np.ndarray) -> int:
-		for i, d in enumerate(cls.__directions):
-			if d == direction:
-				return i
-		raise ValueError("Invalid direction")
-
+		[[False] * SIZE] * SIZE,
+		dtype=np.bool
+	).reshape(SIZE, SIZE)
+	
 	def __init__(self) -> None:
-		self.__board = np.array([
+		self.__board: np.ndarray[tuple[int, int], np.dtype[np.int8]] = np.array([
 			[-1, 0, -1, 0, -1, 0],
 			[0, -1, 0, -1, 0, -1],
 			[0, 0, 0, 0, 0, 0],
 			[0, 0, 0, 0, 0, 0],
 			[1, 0, 1, 0, 1, 0],
 			[0, 1, 0, 1, 0, 1]
-		]).T
+		], dtype=np.int8).reshape(self.SIZE, self.SIZE).T
 
 		self.__positive_should_capture = False
 		self.__negative_should_capture = False
@@ -42,16 +64,16 @@ class Board():
 		else:
 			return self.__negative_should_capture
 
-	def __invalid(self, pos: np.ndarray) -> bool:
-		return pos[0] not in range(self.SIZE) or pos[1] not in range(self.SIZE)
+	def __invalid(self, pos: _c) -> bool:
+		return pos.x not in range(self.SIZE) or pos.y not in range(self.SIZE)
 	
-	def __empty(self, pos: np.ndarray) -> bool:
-		return self.__board[*pos] == 0
+	def __empty(self, pos: _c) -> bool:
+		return self[pos] == 0
 	
-	def __enemy(self, pos1: np.ndarray, pos2: np.ndarray) -> bool:
-		return np.sign(self.__board[*pos1]) == -np.sign(self.__board[*pos2])
+	def __enemy(self, pos1: _c, pos2: _c) -> bool:
+		return np.sign(self[pos1]) == -np.sign(self[pos2])
 
-	def __can_simple_capture(self, pos: np.ndarray, direction: np.ndarray) -> bool:
+	def __can_simple_capture(self, pos: _c, direction: _c) -> bool:
 		enemy_pos = pos + direction
 		empty_pos = enemy_pos + direction
 		if self.__invalid(empty_pos):
@@ -60,7 +82,7 @@ class Board():
 			return False
 		return True
 	
-	def __can_king_capture(self, pos: np.ndarray, direction: np.ndarray) -> bool:
+	def __can_king_capture(self, pos: _c, direction: _c) -> bool:
 		next_next_pos = pos + direction
 		while True:
 			next_pos = next_next_pos
@@ -70,7 +92,7 @@ class Board():
 			if self.__empty(next_next_pos) and self.__enemy(pos, next_pos):
 				return True
 	
-	def __get_simple_directions(self, sign: int) -> np.ndarray:
+	def __get_simple_directions(self, sign: int) -> list[_c]:
 		if sign > 0:
 			return self.__directions[:2]
 		else:
@@ -87,8 +109,8 @@ class Board():
 					break
 
 				for x in range(6):
-					pos = np.array([x, y])
-					piece = self.__board[*pos]
+					pos = _c(x, y)
+					piece = self[pos]
 					if np.sign(piece) != sign:
 						continue
 					t = abs(piece)
@@ -110,50 +132,52 @@ class Board():
 		self.__negative_should_capture = should_capture[-1]
 
 	
-	def is_move_correct(self, start: np.ndarray, end: np.ndarray) -> bool:
-		if self.__invalid(start) or self.__empty(start) or self.__invalid(end) or not self.__empty(end):
+	def is_move_correct(self, start: tuple[int, int], end: tuple[int, int]) -> bool:
+		s = _c(*start)
+		e = _c(*end)
+		if self.__invalid(s) or self.__empty(s) or self.__invalid(e) or not self.__empty(e):
 			return False
 		
 		# Diagonality check
-		delta = end - start
+		delta = e - s
 		if abs(delta[0]) != abs(delta[1]):
 			return False
 		
-		direction = np.sign(delta)
-		piece = self.__board[*start]
+		direction = delta.s()
+		piece = self.__board[*s]
 		t = abs(piece)
 		sign = np.sign(piece)
 
 		# Simple piece
 		if t == 1:
-			direction_index = self.__direction_index(direction)
+			direction_index = self.__directions.index(direction)
 			# Incorrect direction
 			if direction_index < 2 != sign > 0:
 				return False
 			
 			# Non-capture move
-			next_pos = start + direction
-			if next_pos == end:
+			next_pos = s + direction
+			if next_pos == e:
 				return self.check_should_capture(sign) # type: ignore
 			
 			# Capture move
 			next_next_pos = next_pos + direction
-			if next_next_pos == end and self.__enemy(start, next_pos):
+			if next_next_pos == e and self.__enemy(s, next_pos):
 				return True
 			
 			return False
 		
 		# King piece
 		elif t == 2:
-			cur_pos = start
+			cur_pos = s
 			found_enemy = False
-			while cur_pos != end:
+			while cur_pos != e:
 				cur_pos += direction
 
 				if self.__empty(cur_pos):
 					continue
 
-				if found_enemy or not self.__enemy(start, cur_pos):
+				if found_enemy or not self.__enemy(s, cur_pos):
 					return False
 				
 				found_enemy = True
@@ -162,19 +186,20 @@ class Board():
 
 		raise ValueError("Invalid piece on the board!")
 
-	def get_correct_moves(self, start: np.ndarray) -> np.ndarray:
+	def get_correct_moves(self, start: tuple[int, int]) -> np.ndarray[tuple[int, int], np.dtype[np.bool]]:
+		s = _c(*start)
 		ret = self.__invalid_board.copy()
-		if self.__invalid(start) or self.__empty(start):
+		if self.__invalid(s) or self.__empty(s):
 			return ret
 		
-		piece = self.__board[*start]
+		piece = self.__board[*s]
 		t = abs(piece)
 		sign = np.sign(piece)
 
 		# Simple piece
 		if t == 1:
 			for direction in self.__get_simple_directions(sign): # type: ignore
-				next_pos = start + direction
+				next_pos = s + direction
 				if self.__invalid(next_pos):
 					continue
 
@@ -185,7 +210,7 @@ class Board():
 
 				# Capture move
 				next_next_pos = next_pos + direction
-				if not self.__enemy(start, next_pos) or self.__invalid(next_next_pos) or not self.__empty(next_next_pos):
+				if not self.__enemy(s, next_pos) or self.__invalid(next_next_pos) or not self.__empty(next_next_pos):
 					continue
 				ret[*next_next_pos] = True
 			
@@ -194,7 +219,7 @@ class Board():
 		# King piece
 		elif t == 2:
 			for direction in self.__directions:
-				cur_pos = start
+				cur_pos = s
 				found_enemy = False
 				while True:
 					cur_pos += direction
@@ -205,7 +230,7 @@ class Board():
 						ret[*cur_pos] = True
 						continue
 					
-					if self.__enemy(start, cur_pos):
+					if self.__enemy(s, cur_pos):
 						if found_enemy:
 							break
 						found_enemy = True
@@ -215,20 +240,20 @@ class Board():
 
 		raise ValueError("Invalid piece on the board!")
 	
-	def make_move(self, start: np.ndarray, end: np.ndarray) -> None:
+	def make_move(self, start: tuple[int, int], end: tuple[int, int]) -> None:
 		"""
 		**Warning**: No checks are performed!
 
 		Would update the board state, check if the piece should be promoted or capture again
 		"""
-		self.__board[*end] = self.__board[*start]
-		self.__board[*start] = 0
+		self.__board[end] = self.__board[start]
+		self.__board[start] = 0
 
 		# Check if the piece should be promoted
-		if end[1] == 0 and self.__board[*end] == 1:
-			self.__board[*end] = 2
-		elif end[1] == self.SIZE - 1 and self.__board[*end] == -1:
-			self.__board[*end] = -2
+		if end[1] == 0 and self.__board[end] == 1:
+			self.__board[end] = 2
+		elif end[1] == self.SIZE - 1 and self.__board[end] == -1:
+			self.__board[end] = -2
 		
 		# Check if the piece should capture again
 		if self.__enable_update_should_capture:
@@ -259,8 +284,10 @@ class Board():
 				return None
 		return -turn_sign
 
+	def __getitem__(self, pos: _c) -> int:
+		return self.__board[pos.x, pos.y]
 
-	def get_board(self) -> np.ndarray:
+	def get_board(self) -> np.ndarray[tuple[int, int], np.dtype[np.int8]]:
 		return self.__board.copy()
 
 	def __str__(self) -> str:
