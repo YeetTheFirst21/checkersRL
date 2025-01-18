@@ -57,7 +57,8 @@ def pressed_tile(board: Board, pos: tuple[int, int]) -> None:
 		selected_pos = None
 		return
 
-	if not board.is_valid_pos(pos) or not board[pos]:
+	if not board.is_valid_pos(pos) or not board[pos] or \
+			(selected_pos and pos == selected_pos[0]):
 		selected_pos = None
 		return
 
@@ -67,11 +68,11 @@ def pressed_tile(board: Board, pos: tuple[int, int]) -> None:
 	)
 		
 
-def draw_board(board: Board, pos: tuple[float, float], available_size: tuple[float, float], gap_portion: float = 0.2) -> None:
+def draw_board(board: Board, pos: tuple[float, float], available_size: tuple[float, float], gap_portion: float = 0.07) -> None:
 	used_size = min(available_size)
-	size = used_size / (board.SIZE * (1 + gap_portion) + gap_portion)
-	gap = size * gap_portion
-	delta = size + gap
+	d = 10
+	size = (used_size - (board.SIZE + 1) * d) / (board.SIZE * (1 + gap_portion) + gap_portion)
+	gap = size * gap_portion + d
 	x_s = pos[0] + gap
 	x_c = x_s
 	y_c = pos[1] + gap
@@ -108,10 +109,10 @@ def draw_board(board: Board, pos: tuple[float, float], available_size: tuple[flo
 				imgui.push_style_color(imgui.COLOR_BUTTON_ACTIVE, 0.87, 0.72, 0.53, 1.0)
 			
 			if piece != 0:
-				imgui.image_button(textures[piece].texture_id, size, size)
+				imgui.image_button(textures[piece].texture_id, size - 2, size)
 			else:
 				imgui.internal.push_item_flag(imgui.internal.ITEM_DISABLED, True)
-				imgui.image_button(textures[0].texture_id, size, size)
+				imgui.image_button(textures[0].texture_id, size - 2, size)
 				imgui.internal.pop_item_flag()
 
 			if imgui.is_item_hovered() and imgui.is_mouse_clicked():
@@ -119,9 +120,9 @@ def draw_board(board: Board, pos: tuple[float, float], available_size: tuple[flo
 			
 			imgui.pop_style_color(3)
 
-			x_c += delta
+			x_c += size + gap
 
-		y_c += delta
+		y_c += size + gap
 		x_c = x_s
 
 
