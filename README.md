@@ -1,6 +1,6 @@
 # romaAI
 RL to play American checkers;
-The used stack is Python + pyimgui(imgui[glfw]) + NumPy
+The used stack is Python + [pyimgui](https://github.com/pyimgui/pyimgui)(imgui[sdl2]) + [NumPy](https://numpy.org/install/)
 
 #### The rules of American checkers ([YT video](https://youtu.be/ScKIdStgAfU)):
 1. Board size is 6x6
@@ -14,7 +14,7 @@ The used stack is Python + pyimgui(imgui[glfw]) + NumPy
 9. Kings can move and capture diagonally in both directions
 
 #### Implementation details:
-Board is represented as a 6x6 NumPy array, where
+Board is represented as a `6x6` NumPy array, where
 * `2` - king positive checker
 * `1` - simple positive checker
 * `0` - empty square
@@ -30,3 +30,8 @@ self.board = np.array([
 	[0, 1, 0, 1, 0, 1]
 ]).T
 ```
+
+#### Fixing the autocomplete issue with pyimgui
+The following extension could be used to *Create Cython TypeStub for Python* from the `.pyx` files of the library:
+
+https://marketplace.visualstudio.com/items?itemName=ktnrg45.vscode-cython
