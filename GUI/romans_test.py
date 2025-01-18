@@ -2,10 +2,12 @@
 
 from imgui.integrations.sdl2 import SDL2Renderer
 from sdl2 import *
+from sdl2 import sdlimage
 import OpenGL.GL as gl
 import ctypes
 import imgui.core as imgui
 import sys
+import ctypes
 
 
 def main():
@@ -15,6 +17,31 @@ def main():
 
 	show_settings = True
 	imgui.get_io().font_global_scale = 1.5
+
+	texture_surface = sdlimage.IMG_Load(str.encode(r"C:\user\docs\TUM\ReinforcementLearning\repos\romaAI\GUI\test.png"))
+	
+	# glGenTextures(1);
+    # glBindTexture(GL_TEXTURE_2D, ret);
+    # glTexImage2D(GL_TEXTURE_2D, 0, 3, tex_surf->w, tex_surf->h, 0, GL_RGB, GL_UNSIGNED_BYTE, tex_surf->pixels);
+    # glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    # glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    # SDL_FreeSurface(tex_surf);
+
+	width = texture_surface.contents.w
+	height = texture_surface.contents.h
+
+	texture_id = gl.glGenTextures(1)
+	gl.glBindTexture(gl.GL_TEXTURE_2D, texture_id)
+	gl.glTexImage2D(
+		gl.GL_TEXTURE_2D, 0,
+		gl.GL_RGBA,
+		width, height,
+		0, gl.GL_RGBA, gl.GL_UNSIGNED_BYTE,
+		ctypes.cast(texture_surface.contents.pixels, ctypes.POINTER(ctypes.c_void_p))
+	)
+	gl.glTexParameteri(gl.GL_TEXTURE_2D, gl.GL_TEXTURE_MIN_FILTER, gl.GL_LINEAR)
+	gl.glTexParameteri(gl.GL_TEXTURE_2D, gl.GL_TEXTURE_MAG_FILTER, gl.GL_LINEAR)
+	SDL_FreeSurface(texture_surface)
 
 	running = True
 	event = SDL_Event()
@@ -27,6 +54,12 @@ def main():
 		impl.process_inputs()
 
 		imgui.new_frame()
+
+		imgui.begin("Plot example")
+		
+		imgui.image_button(texture_id, 500, 500)
+
+		imgui.end()
 
 		# Top menu bar
 		if imgui.begin_main_menu_bar():
