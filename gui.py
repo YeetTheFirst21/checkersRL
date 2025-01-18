@@ -4,6 +4,7 @@ import os
 import sys
 import pathlib
 from typing import Optional
+from time import sleep
 
 import glfw
 import OpenGL.GL as gl
@@ -11,8 +12,11 @@ import imgui
 from imgui.integrations.glfw import GlfwRenderer
 from PIL import Image
 
+from algo.board import Board
+
 
 CUR_DIR = pathlib.Path(__file__).parent.resolve().absolute()
+
 
 class ImageTexture:
 	def __init__(self, path: str) -> None:
@@ -39,19 +43,58 @@ class ImageTexture:
 			print(f"Failed to load texture {full_path}: {e}")
 
 	def __del__(self) -> None:
-		if self.texture_id is not None:
-			gl.glDeleteTextures(self.texture_id)
+		if self.texture_id is not None and gl.glIsTexture(self.texture_id):
+			# https://stackoverflow.com/a/60352108/8302811
+			c_id = (gl.GLuint * 1) (self.texture_id)
+			gl.glDeleteTextures(1, c_id)
 
 
-def __draw_board() -> None:
-	width, height = imgui.get_content_region_available()
-	cell_width = width / 6
-	cell_height = height / 6
-	for i in range(6):
-		for j in range(6):
-			imgui.same_line()
-			imgui.image_button(test.texture_id, cell_width, cell_height)
-		imgui.new_line()
+def PressedButton(x, y):
+	print(f"Button at ({x}, {y}) pressed")
+
+def draw_board(board: Board, pos: tuple[float, float], available_size: tuple[float, float], gap_portion: float = 0.2) -> None:
+	used_size = min(available_size)
+	size = used_size / (board.SIZE * (1 + gap_portion) + gap_portion)
+	gap = size * gap_portion
+	delta = size + gap
+	x_s = pos[0] + gap
+	x_c = x_s
+	y_c = pos[1] + gap
+
+	for y in range(6):
+		for x in range(6):
+			piece = board[x, y]
+			imgui.set_cursor_pos_x(x_c)
+			imgui.set_cursor_pos_y(y_c)
+
+			# Check if in diagonal to paint diagonals dark brown and rest light brown:
+			if (x + y) % 2 == 0:
+				imgui.push_style_color(imgui.COLOR_BUTTON, 0.87, 0.72, 0.53, 1.0)  # Light brown
+				imgui.push_style_color(imgui.COLOR_BUTTON_HOVERED, 0.87, 0.72, 0.53, 0.6)
+				imgui.push_style_color(imgui.COLOR_BUTTON_ACTIVE, 0.87, 0.72, 0.53, 1.0)
+			else:
+				imgui.push_style_color(imgui.COLOR_BUTTON, 0.55, 0.27, 0.07, 1.0)  # Dark brown
+				imgui.push_style_color(imgui.COLOR_BUTTON_HOVERED, 0.55, 0.27, 0.07, 0.6)
+				imgui.push_style_color(imgui.COLOR_BUTTON_ACTIVE, 0.55, 0.27, 0.07, 1.0)
+			
+			if piece != 0:
+				# imgui.push_style_color(imgui.COLOR_BUTTON, 0.87, 0.72, 0.53, 1.0)  # Light brown
+				# imgui.push_style_color(imgui.COLOR_BUTTON_HOVERED, 0.87, 0.72, 0.53, 0.6)
+				# imgui.push_style_color(imgui.COLOR_BUTTON_ACTIVE, 0.87, 0.72, 0.53, 1.0)
+				imgui.image_button(textures[piece].texture_id, size, size)
+				if imgui.is_item_hovered() and imgui.is_mouse_clicked():
+					PressedButton(x, y)
+			else:
+				imgui.internal.push_item_flag(imgui.internal.ITEM_DISABLED, True)
+				imgui.image_button(textures[0].texture_id, size, size)
+				imgui.internal.pop_item_flag()
+			
+			imgui.pop_style_color(3)
+
+			x_c += delta
+
+		y_c += delta
+		x_c = x_s
 
 
 def main():
@@ -63,8 +106,16 @@ def main():
 	show_settings = True
 	imgui.get_io().font_global_scale = 1.5
 
-	global test
-	test = ImageTexture("./icons/test.png")
+	global textures
+	textures = {
+		-2: ImageTexture("./icons/negative_king.png"),
+		-1: ImageTexture("./icons/negative_simple.png"),
+		0: ImageTexture("./icons/empty.png"),
+		1: ImageTexture("./icons/positive_simple.png"),
+		2: ImageTexture("./icons/positive_king.png"),
+	}
+
+	board = Board()
 
 	# MAIN LOOP
 	while not glfw.window_should_close(window):
@@ -73,8 +124,13 @@ def main():
 
 		imgui.new_frame()
 
-		imgui.begin("Plot example")
-		__draw_board()
+		imgui.begin("Board")
+		imgui.set_window_size(500, 500)
+		draw_board(
+			board,
+			imgui.get_cursor_pos(),
+			imgui.get_content_region_available()
+		)
 		imgui.end()
 
 		# Top menu bar
@@ -100,6 +156,7 @@ def main():
 		imgui.render()
 		impl.render(imgui.get_draw_data())
 		glfw.swap_buffers(window)
+		sleep(10e-3)
 
 	impl.shutdown()
 	glfw.terminate()

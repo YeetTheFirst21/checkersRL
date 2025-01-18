@@ -284,8 +284,8 @@ class Board():
 				return None
 		return -turn_sign
 
-	def __getitem__(self, pos: _c) -> int:
-		return self.__board[pos.x, pos.y]
+	def __getitem__(self, pos: _c | tuple[int, int]) -> int:
+		return self.__board[pos[0], pos[1]]
 
 	def get_board(self) -> np.ndarray[tuple[int, int], np.dtype[np.int8]]:
 		return self.__board.copy()
