@@ -4,6 +4,7 @@ import sys
 import pathlib
 from typing import Optional
 from time import sleep
+import json
 
 import glfw
 import OpenGL.GL as gl
@@ -64,7 +65,7 @@ def pressed_tile(board: Board, pos: tuple[int, int]) -> None:
 
 	selected_pos = (
 		pos,
-		board.get_correct_moves(pos)
+		board.compute_correct_moves(pos)
 	)
 		
 
@@ -114,11 +115,18 @@ def draw_board(board: Board, pos: tuple[float, float], available_size: tuple[flo
 				imgui.internal.push_item_flag(imgui.internal.ITEM_DISABLED, True)
 				imgui.image_button(textures[0].texture_id, size - 2, size)
 				imgui.internal.pop_item_flag()
-
-			if imgui.is_item_hovered() and imgui.is_mouse_clicked():
-				pressed_tile(board, pos)
 			
 			imgui.pop_style_color(3)
+
+			if imgui.is_item_hovered():
+				if imgui.is_mouse_clicked():
+					pressed_tile(board, pos)
+
+				with imgui.begin_tooltip():
+					imgui.text(f"pos: {pos}")
+					imgui.text(f"piece: {piece}")
+					if selected_pos and selected_pos[0] != pos:
+						imgui.text(f"Correct move: {board.is_move_correct(selected_pos[0], pos)}")
 
 			x_c += size + gap
 
@@ -138,7 +146,6 @@ def main():
 
 	# INIT STAGE
 	show_settings = True
-	reset_settings_pos = False
 	imgui.get_io().font_global_scale = 1.5
 
 	global textures
@@ -154,6 +161,7 @@ def main():
 	selected_pos = None
 
 	board = Board()
+	show_tile_numbers = False
 
 	# MAIN LOOP
 	while not glfw.window_should_close(window):
@@ -162,8 +170,10 @@ def main():
 
 		imgui.new_frame()
 
+		# Board window
 		imgui.begin("Board")
 		imgui.set_window_size(500, 500)
+		imgui.set_window_position(10, 50, imgui.ONCE)
 		draw_board(
 			board,
 			imgui.get_cursor_pos(),
@@ -172,20 +182,34 @@ def main():
 		imgui.end()
 
 		# Top menu bar
-		if imgui.begin_main_menu_bar():
-			clicked, _ = imgui.menu_item("Toggle settings", "Ctrl+,", False)
+		with imgui.begin_main_menu_bar():
+			clicked, _ = imgui.menu_item("Settings", "Ctrl+,", False)
 			if clicked:
-				show_settings = not show_settings
-				reset_settings_pos = True
-			imgui.end_main_menu_bar()
+				show_settings = True
 
+		# Settings window
 		if show_settings:
 			_, show_settings = imgui.begin("Settings", True, imgui.WINDOW_NO_COLLAPSE)
-			imgui.set_window_size(300, 200)
-			if reset_settings_pos:
-				imgui.set_window_position(10, 10)
-				reset_settings_pos = False
+			imgui.set_window_size(400, 400)
+			imgui.set_window_position(510, 50, imgui.APPEARING)
 
+			if imgui.button("Reset board"):
+				board = Board()
+
+			imgui.same_line()
+			_, show_tile_numbers = imgui.checkbox("Show tile numbers", show_tile_numbers)
+			
+			imgui.text(str(board))
+			imgui.text(f"Positive should capture: {board.check_should_capture(1)}")
+			imgui.text(f"Negative should capture: {board.check_should_capture(-1)}")
+
+			imgui.text("Correct moves cache:")
+			imgui.text(json.dumps(
+				{repr(k): v for (k,v) in board.get_correct_moves_cache().items()},
+				indent=2
+			))
+			
+			imgui.separator()
 			changed, value = imgui.slider_float("Scale", imgui.get_io().font_global_scale, 0.3, 2.0)
 			if changed:
 				imgui.get_io().font_global_scale = value

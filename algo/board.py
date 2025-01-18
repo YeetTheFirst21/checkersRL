@@ -33,6 +33,13 @@ class _c:
 		elif index == 1:
 			return self.y
 		raise IndexError("Invalid index")
+	
+	def __hash__(self) -> int:
+		# https://stackoverflow.com/a/4005376/8302811
+		return hash((self.x, self.y))
+	
+	def __repr__(self) -> str:
+		return f"({self.x}, {self.y})"
 
 class Board():
 	SIZE = 6
@@ -61,6 +68,8 @@ class Board():
 		self.__positive_should_capture = False
 		self.__negative_should_capture = False
 		self.__enable_update_should_capture = True
+
+		self.__correct_moves_cache: dict[tuple[_c, _c], bool] = {}
 
 	def check_should_capture(self, sign: int) -> bool:
 		if sign > 0:
@@ -137,8 +146,15 @@ class Board():
 
 	
 	def is_move_correct(self, start: tuple[int, int], end: tuple[int, int]) -> bool:
-		s = _c(*start)
-		e = _c(*end)
+		args = (_c(*start), _c(*end))
+		if args in self.__correct_moves_cache:
+			return self.__correct_moves_cache[args]
+		
+		ret = self.__compute_correct_move(*args)
+		self.__correct_moves_cache[args] = ret
+		return ret
+
+	def __compute_correct_move(self, s: _c, e: _c) -> bool:
 		if self.__invalid(s) or self.__empty(s) or self.__invalid(e) or not self.__empty(e):
 			return False
 		
@@ -190,7 +206,7 @@ class Board():
 
 		raise ValueError("Invalid piece on the board!")
 
-	def get_correct_moves(self, start: tuple[int, int]) -> np.ndarray[tuple[int, int], np.dtype[np.bool]]:
+	def compute_correct_moves(self, start: tuple[int, int]) -> np.ndarray[tuple[int, int], np.dtype[np.bool]]:
 		s = _c(*start)
 		ret = self.__invalid_board.copy()
 		if self.__invalid(s) or self.__empty(s):
@@ -250,6 +266,10 @@ class Board():
 
 		Would update the board state, check if the piece should be promoted or capture again
 		"""
+
+		# Invalidate the correct moves cache
+		self.__correct_moves_cache.clear()
+
 		piece = self.__board[start]
 
 		if (piece > 0 and self.__positive_should_capture) or \
@@ -305,7 +325,7 @@ class Board():
 			return turn_sign
 		
 		for pos in turns_pieces[sign]:
-			if any(self.get_correct_moves(pos)):
+			if any(self.compute_correct_moves(pos)):
 				return None
 		return -turn_sign
 
@@ -320,18 +340,13 @@ class Board():
 
 	def __str__(self) -> str:
 		ret = ""
-		for row in self.__board:
-			for square in row:
-				if square == 1:
-					piece = "|p"
-				elif square == -1:
-					piece = "|n"
-				elif square == 2:
-					piece = "|P"
-				elif square == -2:
-					piece = "|N"
-				else:
-					piece = "| "
-				ret += piece
+		for y in range(self.SIZE):
+			for x in range(self.SIZE):
+				ret += f"|{self[x, y]:2}"
 			ret += "|\n"
 		return ret
+	
+
+	# Debugging methods
+	def get_correct_moves_cache(self) -> dict[tuple[_c, _c], bool]:
+		return self.__correct_moves_cache
