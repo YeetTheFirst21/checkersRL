@@ -24,6 +24,9 @@ class _c:
 	def __sub__(self, other: '_c') -> '_c':
 		return _c(self.x - other.x, self.y - other.y)
 	
+	def __eq__(self, value: '_c') -> bool:
+		return self.x == value.x and self.y == value.y
+	
 	def __getitem__(self, index: int) -> int:
 		if index == 0:
 			return self.x
@@ -33,6 +36,7 @@ class _c:
 
 class Board():
 	SIZE = 6
+	TILING_PARITY = 0
 	__directions = [
 		_c(-1, -1),
 		_c(1, -1),
@@ -71,7 +75,7 @@ class Board():
 		return self[pos] == 0
 	
 	def __enemy(self, pos1: _c, pos2: _c) -> bool:
-		return np.sign(self[pos1]) == -np.sign(self[pos2])
+		return _s(self[pos1]) == -_s(self[pos2])
 
 	def __can_simple_capture(self, pos: _c, direction: _c) -> bool:
 		enemy_pos = pos + direction
@@ -111,7 +115,7 @@ class Board():
 				for x in range(6):
 					pos = _c(x, y)
 					piece = self[pos]
-					if np.sign(piece) != sign:
+					if _s(piece) != sign:
 						continue
 					t = abs(piece)
 					if t == 1:
@@ -146,7 +150,7 @@ class Board():
 		direction = delta.s()
 		piece = self.__board[*s]
 		t = abs(piece)
-		sign = np.sign(piece)
+		sign = _s(piece)
 
 		# Simple piece
 		if t == 1:
@@ -194,7 +198,7 @@ class Board():
 		
 		piece = self.__board[*s]
 		t = abs(piece)
-		sign = np.sign(piece)
+		sign = _s(piece)
 
 		# Simple piece
 		if t == 1:
@@ -246,7 +250,28 @@ class Board():
 
 		Would update the board state, check if the piece should be promoted or capture again
 		"""
-		self.__board[end] = self.__board[start]
+		piece = self.__board[start]
+
+		if (piece > 0 and self.__positive_should_capture) or \
+			(piece < 0 and self.__negative_should_capture):
+			# We should determine the enemy and capture
+			e = _c(*end)
+			s = _c(*start)
+			direction = (e - s).s()
+			next_pos = s
+			enemy_pos: Optional[_c] = None
+			while True:
+				next_pos += direction
+				if self.__invalid(next_pos):
+					break
+				if self.__enemy(s, next_pos):
+					enemy_pos = next_pos
+					break
+			assert enemy_pos is not None # We should have found the enemy, cos we have to capture now
+			self.__board[enemy_pos.x, enemy_pos.y] = 0
+
+		# Move our piece
+		self.__board[end] = piece
 		self.__board[start] = 0
 
 		# Check if the piece should be promoted
@@ -268,7 +293,7 @@ class Board():
 		not_turn_has_pieces = False
 		for x in range(6):
 			for y in range(6):
-				sign = np.sign(self.__board[x, y])
+				sign = _s(self.__board[x, y])
 				if sign == turn_sign:
 					turns_pieces.append(np.array([x, y]))
 				elif sign != 0:
@@ -289,6 +314,9 @@ class Board():
 
 	def get_board(self) -> np.ndarray[tuple[int, int], np.dtype[np.int8]]:
 		return self.__board.copy()
+
+	def is_valid_pos(self, pos: tuple[int, int]) -> bool:
+		return pos[0] in range(self.SIZE) and pos[1] in range(self.SIZE) and (pos[0] + pos[1]) % 2 == self.TILING_PARITY
 
 	def __str__(self) -> str:
 		ret = ""

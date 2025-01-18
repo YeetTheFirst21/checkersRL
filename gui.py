@@ -1,6 +1,5 @@
 # https://github.com/pyimgui/pyimgui/blob/master/doc/examples/plots.py
 
-import os
 import sys
 import pathlib
 from typing import Optional
@@ -11,6 +10,7 @@ import OpenGL.GL as gl
 import imgui
 from imgui.integrations.glfw import GlfwRenderer
 from PIL import Image
+import numpy as np
 
 from algo.board import Board
 
@@ -49,8 +49,23 @@ class ImageTexture:
 			gl.glDeleteTextures(1, c_id)
 
 
-def PressedButton(x, y):
-	print(f"Button at ({x}, {y}) pressed")
+def pressed_tile(board: Board, pos: tuple[int, int]) -> None:
+	global selected_pos
+
+	if selected_pos and selected_pos[1][pos]:
+		board.make_move(selected_pos[0], pos)
+		selected_pos = None
+		return
+
+	if not board.is_valid_pos(pos) or not board[pos]:
+		selected_pos = None
+		return
+
+	selected_pos = (
+		pos,
+		board.get_correct_moves(pos)
+	)
+		
 
 def draw_board(board: Board, pos: tuple[float, float], available_size: tuple[float, float], gap_portion: float = 0.2) -> None:
 	used_size = min(available_size)
@@ -63,31 +78,44 @@ def draw_board(board: Board, pos: tuple[float, float], available_size: tuple[flo
 
 	for y in range(6):
 		for x in range(6):
-			piece = board[x, y]
+			pos = (x, y)
+			piece = board[pos]
 			imgui.set_cursor_pos_x(x_c)
 			imgui.set_cursor_pos_y(y_c)
 
-			# Check if in diagonal to paint diagonals dark brown and rest light brown:
-			if (x + y) % 2 == 0:
-				imgui.push_style_color(imgui.COLOR_BUTTON, 0.87, 0.72, 0.53, 1.0)  # Light brown
-				imgui.push_style_color(imgui.COLOR_BUTTON_HOVERED, 0.87, 0.72, 0.53, 0.6)
-				imgui.push_style_color(imgui.COLOR_BUTTON_ACTIVE, 0.87, 0.72, 0.53, 1.0)
-			else:
+			# Highlighting valid moves with nice green
+			if selected_pos and selected_pos[1][pos]:
+				imgui.push_style_color(imgui.COLOR_BUTTON, 0.0, 0.5, 0.0, 1.0)
+				imgui.push_style_color(imgui.COLOR_BUTTON_HOVERED, 0.0, 0.5, 0.0, 0.6)
+				imgui.push_style_color(imgui.COLOR_BUTTON_ACTIVE, 0.0, 0.5, 0.0, 1.0)
+			
+			# Highlighting selected piece with nice yellow
+			elif selected_pos and pos == selected_pos[0]:
+				imgui.push_style_color(imgui.COLOR_BUTTON, 0.5, 0.5, 0.0, 1.0)
+				imgui.push_style_color(imgui.COLOR_BUTTON_HOVERED, 0.5, 0.5, 0.0, 0.6)
+				imgui.push_style_color(imgui.COLOR_BUTTON_ACTIVE, 0.5, 0.5, 0.0, 1.0)
+			
+			# Dark tiles (which are valid)
+			elif board.is_valid_pos(pos):
 				imgui.push_style_color(imgui.COLOR_BUTTON, 0.55, 0.27, 0.07, 1.0)  # Dark brown
 				imgui.push_style_color(imgui.COLOR_BUTTON_HOVERED, 0.55, 0.27, 0.07, 0.6)
 				imgui.push_style_color(imgui.COLOR_BUTTON_ACTIVE, 0.55, 0.27, 0.07, 1.0)
+
+			# Light tiles
+			else:
+				imgui.push_style_color(imgui.COLOR_BUTTON, 0.87, 0.72, 0.53, 1.0)  # Light brown
+				imgui.push_style_color(imgui.COLOR_BUTTON_HOVERED, 0.87, 0.72, 0.53, 0.6)
+				imgui.push_style_color(imgui.COLOR_BUTTON_ACTIVE, 0.87, 0.72, 0.53, 1.0)
 			
 			if piece != 0:
-				# imgui.push_style_color(imgui.COLOR_BUTTON, 0.87, 0.72, 0.53, 1.0)  # Light brown
-				# imgui.push_style_color(imgui.COLOR_BUTTON_HOVERED, 0.87, 0.72, 0.53, 0.6)
-				# imgui.push_style_color(imgui.COLOR_BUTTON_ACTIVE, 0.87, 0.72, 0.53, 1.0)
 				imgui.image_button(textures[piece].texture_id, size, size)
-				if imgui.is_item_hovered() and imgui.is_mouse_clicked():
-					PressedButton(x, y)
 			else:
 				imgui.internal.push_item_flag(imgui.internal.ITEM_DISABLED, True)
 				imgui.image_button(textures[0].texture_id, size, size)
 				imgui.internal.pop_item_flag()
+
+			if imgui.is_item_hovered() and imgui.is_mouse_clicked():
+				pressed_tile(board, pos)
 			
 			imgui.pop_style_color(3)
 
@@ -97,6 +125,11 @@ def draw_board(board: Board, pos: tuple[float, float], available_size: tuple[flo
 		x_c = x_s
 
 
+selected_pos: Optional[tuple[
+	tuple[int, int],
+	np.ndarray
+]]
+
 def main():
 	window = __impl_glfw_init()
 	imgui.create_context()
@@ -104,6 +137,7 @@ def main():
 
 	# INIT STAGE
 	show_settings = True
+	reset_settings_pos = False
 	imgui.get_io().font_global_scale = 1.5
 
 	global textures
@@ -114,6 +148,9 @@ def main():
 		1: ImageTexture("./icons/positive_simple.png"),
 		2: ImageTexture("./icons/positive_king.png"),
 	}
+
+	global selected_pos
+	selected_pos = None
 
 	board = Board()
 
@@ -138,11 +175,15 @@ def main():
 			clicked, _ = imgui.menu_item("Toggle settings", "Ctrl+,", False)
 			if clicked:
 				show_settings = not show_settings
+				reset_settings_pos = True
 			imgui.end_main_menu_bar()
 
 		if show_settings:
 			_, show_settings = imgui.begin("Settings", True, imgui.WINDOW_NO_COLLAPSE)
 			imgui.set_window_size(300, 200)
+			if reset_settings_pos:
+				imgui.set_window_position(10, 10)
+				reset_settings_pos = False
 
 			changed, value = imgui.slider_float("Scale", imgui.get_io().font_global_scale, 0.3, 2.0)
 			if changed:
