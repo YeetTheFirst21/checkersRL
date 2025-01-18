@@ -30,3 +30,8 @@ self.board = np.array([
 	[0, 1, 0, 1, 0, 1]
 ]).T
 ```
+
+#### Fixing the autocomplete issue with pyimgui
+The following extension could be used to *Create Cython TypeStub for Python* from the `.pyx` files of the library:
+
+https://marketplace.visualstudio.com/items?itemName=ktnrg45.vscode-cython
