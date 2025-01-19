@@ -182,13 +182,13 @@ def main():
 
 		# Top menu bar
 		with imgui.begin_main_menu_bar():
-			clicked, _ = imgui.menu_item("Settings", "Ctrl+,", False)
+			clicked, _ = imgui.menu_item("Properties", "Ctrl+,", False)
 			if clicked:
 				show_settings = True
 
 		# Settings window
 		if show_settings:
-			_, show_settings = imgui.begin("Settings", True, imgui.WINDOW_NO_COLLAPSE)
+			_, show_settings = imgui.begin("Properties", True, imgui.WINDOW_NO_COLLAPSE)
 			imgui.set_window_size(400, 400)
 			imgui.set_window_position(510, 50, imgui.APPEARING)
 
@@ -196,9 +196,14 @@ def main():
 				board = Board()
 			
 			imgui.text(str(board))
-			imgui.text(f"Positive should capture: {board.check_should_capture(1)}")
-			imgui.text(f"Negative should capture: {board.check_should_capture(-1)}")
 
+			imgui.separator()
+			imgui.text(f"Should capture:\npositive: {board.check_should_capture(1)}\nnegative: {board.check_should_capture(-1)}")
+
+			imgui.separator()
+			imgui.text(f"Game state:\nif it's +1's turn: {board.get_game_state(1)}\nif it's -1's turn: {board.get_game_state(-1)}")
+
+			imgui.separator()
 			imgui.text("Correct moves cache:")
 			imgui.text(json.dumps(
 				{repr(k): v for (k,v) in board.get_correct_moves_cache().items()},

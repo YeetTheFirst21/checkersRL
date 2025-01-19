@@ -70,6 +70,7 @@ class Board():
 		self.__enable_update_should_capture = True
 
 		self.__correct_moves_cache: dict[tuple[_c, _c], bool] = {}
+		self.__game_state_cache: dict[int, Optional[int]] = {}
 
 	def check_should_capture(self, sign: int) -> bool:
 		if sign > 0:
@@ -291,8 +292,9 @@ class Board():
 		Would update the board state, check if the piece should be promoted or capture again
 		"""
 
-		# Invalidate the correct moves cache
+		# Invalidate the caches
 		self.__correct_moves_cache.clear()
+		self.__game_state_cache.clear()
 
 		piece = self.__board[start]
 
@@ -328,28 +330,39 @@ class Board():
 		if self.__enable_update_should_capture:
 			self.__update_should_capture()
 
-	def is_game_over(self, turn_sign: int) -> Optional[int]:
+	def get_game_state(self, turn_sign: int) -> Optional[int]:
 		"""
 		Returns:
-			1 if positive player wins, -1 if negative player wins, 0 if the game is not over
+			1 if positive player wins, -1 if negative player wins, None if the game is not over
 		"""
-		turns_pieces = []
-		not_turn_has_pieces = False
+		if turn_sign in self.__game_state_cache:
+			return self.__game_state_cache[turn_sign]
+		
+		ret = self.__compute_game_state(turn_sign)
+		self.__game_state_cache[turn_sign] = ret
+		return ret
+
+	def __compute_game_state(self, turn_sign: int) -> Optional[int]:
+		"""
+		1 if positive player wins, -1 if negative player wins, None if the game is not over
+		"""
+		turns_pieces: list[tuple[int, int]] = []
+		opp_turn_has_pieces = False
 		for x in range(6):
 			for y in range(6):
 				sign = _s(self.__board[x, y])
 				if sign == turn_sign:
-					turns_pieces.append(np.array([x, y]))
+					turns_pieces.append((x, y))
 				elif sign != 0:
-					not_turn_has_pieces = True
+					opp_turn_has_pieces = True
 		
 		if not turns_pieces:
 			return -turn_sign
-		elif not not_turn_has_pieces:
+		elif not opp_turn_has_pieces:
 			return turn_sign
 		
-		for pos in turns_pieces[sign]:
-			if any(self.compute_correct_moves(pos)):
+		for pos in turns_pieces:
+			if np.any(self.compute_correct_moves(pos)):
 				return None
 		return -turn_sign
 
