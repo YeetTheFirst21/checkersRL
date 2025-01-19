@@ -189,13 +189,17 @@ def main():
 		# Settings window
 		if show_settings:
 			_, show_settings = imgui.begin("Properties", True, imgui.WINDOW_NO_COLLAPSE)
-			imgui.set_window_size(400, 400)
+			imgui.set_window_size(400, 500)
 			imgui.set_window_position(510, 50, imgui.APPEARING)
 
 			if imgui.button("Reset board"):
 				board = Board()
+
+			_, board.enable_update_should_capture = imgui.checkbox(
+				"Enable should capture rule", board.enable_update_should_capture)
 			
-			imgui.text(str(board))
+			imgui.separator()
+			imgui.text(f"Board state:\n{board}")
 
 			imgui.separator()
 			imgui.text(f"Should capture:\npositive: {board.check_should_capture(1)}\nnegative: {board.check_should_capture(-1)}")

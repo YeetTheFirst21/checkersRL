@@ -374,6 +374,20 @@ class Board():
 
 	def is_valid_pos(self, pos: tuple[int, int]) -> bool:
 		return pos[0] in range(self.SIZE) and pos[1] in range(self.SIZE) and (pos[0] + pos[1]) % 2 == self.TILING_PARITY
+	
+	@property
+	def enable_update_should_capture(self) -> bool:
+		return self.__enable_update_should_capture
+	
+	@enable_update_should_capture.setter
+	def enable_update_should_capture(self, value: bool) -> None:
+		if not self.__enable_update_should_capture and value:
+			self.__update_should_capture()
+		elif not value:
+			self.__positive_should_capture = False
+			self.__negative_should_capture = False
+
+		self.__enable_update_should_capture = value
 
 	def __repr__(self) -> str:
 		ret = ""
