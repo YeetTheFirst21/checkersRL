@@ -161,7 +161,6 @@ def main():
 	selected_pos = None
 
 	board = Board()
-	show_tile_numbers = False
 
 	# MAIN LOOP
 	while not glfw.window_should_close(window):
@@ -171,7 +170,7 @@ def main():
 		imgui.new_frame()
 
 		# Board window
-		imgui.begin("Board")
+		imgui.begin("Board", False, imgui.WINDOW_NO_COLLAPSE)
 		imgui.set_window_size(500, 500)
 		imgui.set_window_position(10, 50, imgui.ONCE)
 		draw_board(
@@ -195,9 +194,6 @@ def main():
 
 			if imgui.button("Reset board"):
 				board = Board()
-
-			imgui.same_line()
-			_, show_tile_numbers = imgui.checkbox("Show tile numbers", show_tile_numbers)
 			
 			imgui.text(str(board))
 			imgui.text(f"Positive should capture: {board.check_should_capture(1)}")
