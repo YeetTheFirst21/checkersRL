@@ -64,10 +64,6 @@ class Board():
 		_c(1, 1),
 		_c(-1, 1)
 	]
-	__invalid_board = np.array(
-		[[False] * SIZE] * SIZE,
-		dtype=np.bool
-	).reshape(SIZE, SIZE)
 	
 	def __init__(self) -> None:
 		self.__board: np.ndarray[tuple[int, int], np.dtype[np.int8]] = np.array([

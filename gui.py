@@ -6,13 +6,19 @@ from typing import Optional
 from time import sleep
 import json
 
+import PIL.Image
+import PIL.ImageFile
 import glfw
 import OpenGL.GL as gl
 import imgui
 from imgui.integrations.glfw import GlfwRenderer
+import PIL
 from PIL import Image
 import numpy as np
 
+from collections.abc import Callable
+
+import algo.board
 from algo.board import Board
 
 
@@ -20,14 +26,12 @@ CUR_DIR = pathlib.Path(__file__).parent.resolve().absolute()
 
 
 class ImageTexture:
-	def __init__(self, path: str) -> None:
-		self.texture_id: Optional[int]
-
-		full_path = (CUR_DIR / path).resolve().absolute()
-
+	def __load_image(self, path: pathlib.Path, filter: Callable[[Image.Image], Image.Image] = lambda x: x) -> Optional[None]:
 		try:
-			image = Image.open(full_path)
-			img_data = image.convert("RGBA").tobytes()
+			with Image.open(path) as _image:
+				image = _image.convert("RGBA")
+			image = filter(image)
+			img_data = image.tobytes()
 			width, height = image.size
 
 			texture_id = gl.glGenTextures(1)
@@ -37,11 +41,27 @@ class ImageTexture:
 			gl.glTexParameteri(gl.GL_TEXTURE_2D, gl.GL_TEXTURE_MAG_FILTER, gl.GL_LINEAR)
 			gl.glBindTexture(gl.GL_TEXTURE_2D, 0)
 
-			self.texture_id = texture_id
+			return texture_id
 
 		except Exception as e:
-			self.texture_id = None
-			print(f"Failed to load texture {full_path}: {e}")
+			print(f"Failed to load texture {path}: {e}")
+			return None
+
+	def __init__(self, path: str) -> None:
+		full_path = (CUR_DIR / path).resolve().absolute()
+		self.texture_id: Optional[int] = self.__load_image(full_path)
+
+
+		def reduce_alpha(image: Image.Image) -> Image.Image:
+			# https://stackoverflow.com/a/72983761/8302811
+			im2 = image.copy()
+			im2.putalpha(150)
+			image.paste(im2, image)
+			return image
+		
+		self.disabled_texture_id: Optional[int] = self.__load_image(
+			full_path, reduce_alpha)
+
 
 	def __del__(self) -> None:
 		if self.texture_id is not None and gl.glIsTexture(self.texture_id):
@@ -81,6 +101,7 @@ def draw_board(board: Board, pos: tuple[float, float], available_size: tuple[flo
 		for x in range(6):
 			pos = (x, y)
 			piece = board[pos]
+			sign = algo.board._s(piece)
 			imgui.set_cursor_pos_x(x_c)
 			imgui.set_cursor_pos_y(y_c)
 
@@ -107,13 +128,18 @@ def draw_board(board: Board, pos: tuple[float, float], available_size: tuple[flo
 				imgui.push_style_color(imgui.COLOR_BUTTON, 0.87, 0.72, 0.53, 1.0)  # Light brown
 				imgui.push_style_color(imgui.COLOR_BUTTON_HOVERED, 0.87, 0.72, 0.53, 0.6)
 				imgui.push_style_color(imgui.COLOR_BUTTON_ACTIVE, 0.87, 0.72, 0.53, 1.0)
-			
-			if piece != 0:
-				imgui.image_button(textures[piece].texture_id, size - 2, size)
-			else:
-				imgui.internal.push_item_flag(imgui.internal.ITEM_DISABLED, True)
+
+			if piece == 0:
 				imgui.image_button(textures[0].texture_id, size - 2, size)
-				imgui.internal.pop_item_flag()
+			else:
+				if board.get_correct_moves(pos) and sign == board.turn_sign:
+					imgui.image_button(textures[piece].texture_id, size - 2, size)
+				else:
+					# imgui.push_style_var(imgui.STYLE_ALPHA, 0.5)
+					# imgui.image_button(textures[piece].texture_id, size - 2, size)
+					# imgui.pop_style_var(1)
+
+					imgui.image_button(textures[piece].disabled_texture_id, size - 2, size)
 			
 			imgui.pop_style_color(3)
 
@@ -196,15 +222,15 @@ def main():
 
 			_, board.enable_update_should_capture = imgui.checkbox(
 				"Enable should capture rule", board.enable_update_should_capture)
+
+			imgui.separator()
+			imgui.text(f"{board.game_state}, turn: {'positive' if board.turn_sign > 0 else 'negative'}")
 			
 			imgui.separator()
 			imgui.text(f"Board state:\n{board}")
 
 			imgui.separator()
 			imgui.text(f"Should capture:\npositive: {board.check_should_capture(1)}\nnegative: {board.check_should_capture(-1)}")
-
-			imgui.separator()
-			imgui.text(f"Game state: {board.game_state}")
 
 			imgui.separator()
 			imgui.text("Correct moves cache:")
