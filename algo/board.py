@@ -65,18 +65,14 @@ class Board():
 			[0, 1, 0, 1, 0, 1]
 		], dtype=np.int8).reshape(self.SIZE, self.SIZE).T
 
-		self.__positive_should_capture = False
-		self.__negative_should_capture = False
+		self.__should_capture = {1: False, -1: False}
 		self.__enable_update_should_capture = True
 
 		self.__correct_moves_cache: dict[tuple[_c, _c], bool] = {}
 		self.__game_state_cache: dict[int, Optional[int]] = {}
 
 	def check_should_capture(self, sign: int) -> bool:
-		if sign > 0:
-			return self.__positive_should_capture
-		else:
-			return self.__negative_should_capture
+		return self.__should_capture[sign]
 
 	def __invalid(self, pos: _c) -> bool:
 		return pos.x not in range(self.SIZE) or pos.y not in range(self.SIZE)
@@ -95,7 +91,8 @@ class Board():
 	
 	def __update_should_capture(self) -> None:
 		# Determine if a player should capture
-		should_capture = {-1: False, 1: False}
+		self.__should_capture = {-1: False, 1: False}
+		should_capture = self.__should_capture
 		# We are iterating over signs first, so that we can break preliminary
 		for sign in [-1, 1]:
 			simple_directions = self.__get_simple_directions(sign)
@@ -153,9 +150,6 @@ class Board():
 
 					if should_capture[sign]:
 						break
-		
-		self.__positive_should_capture = should_capture[1]
-		self.__negative_should_capture = should_capture[-1]
 
 	
 	def is_move_correct(self, start: tuple[int, int], end: tuple[int, int]) -> bool:
@@ -298,8 +292,7 @@ class Board():
 
 		piece = self.__board[start]
 
-		if (piece > 0 and self.__positive_should_capture) or \
-			(piece < 0 and self.__negative_should_capture):
+		if self.check_should_capture(_s(piece)):
 			# We should determine the enemy and capture
 			e = _c(*end)
 			s = _c(*start)
@@ -384,8 +377,7 @@ class Board():
 		if not self.__enable_update_should_capture and value:
 			self.__update_should_capture()
 		elif not value:
-			self.__positive_should_capture = False
-			self.__negative_should_capture = False
+			self.__should_capture = {1: False, -1: False}
 
 		self.__enable_update_should_capture = value
 
