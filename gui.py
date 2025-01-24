@@ -55,7 +55,7 @@ class ImageTexture:
 		def reduce_alpha(image: Image.Image) -> Image.Image:
 			# https://stackoverflow.com/a/72983761/8302811
 			im2 = image.copy()
-			im2.putalpha(150)
+			im2.putalpha(160)
 			image.paste(im2, image)
 			return image
 		
@@ -78,7 +78,9 @@ def on_pressed_tile(board: Board, pos: tuple[int, int]) -> None:
 		return
 
 	if not board.is_valid_pos(pos) or not board[pos] or \
-			(selected_pos and pos == selected_pos[0]):
+			(selected_pos and pos == selected_pos[0]) or \
+			algo.board._s(board[pos]) != board.turn_sign or \
+			not board.get_correct_moves(pos):
 		selected_pos = None
 		return
 
@@ -194,8 +196,11 @@ def main():
 
 		imgui.new_frame()
 
+		turn_name = "positive" if board.turn_sign > 0 else "negative"
+
 		# Board window
-		imgui.begin("Board", False, imgui.WINDOW_NO_COLLAPSE)
+		# https://github.com/ocornut/imgui/issues/6872
+		imgui.begin(f"Board - {turn_name} turn###Board", False, imgui.WINDOW_NO_COLLAPSE)
 		imgui.set_window_size(500, 500)
 		imgui.set_window_position(10, 50, imgui.ONCE)
 		draw_board(
@@ -224,7 +229,7 @@ def main():
 				"Enable should capture rule", board.enable_update_should_capture)
 
 			imgui.separator()
-			imgui.text(f"{board.game_state}, turn: {'positive' if board.turn_sign > 0 else 'negative'}")
+			imgui.text(f"{board.game_state}, turn: {turn_name}")
 			
 			imgui.separator()
 			imgui.text(f"Board state:\n{board}")

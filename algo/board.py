@@ -211,6 +211,10 @@ class Board():
 		
 		return ret
 	
+	def __invalidate_cache(self) -> None:
+		self.__correct_moves_cache.clear()
+		self.__game_state_cache = None
+
 	def __move_piece(self, start: tuple[int, int], end: tuple[int, int]) -> None:
 		"""
 		**Warning**: No checks are performed and no turn change is made!
@@ -218,9 +222,7 @@ class Board():
 		Would update the board state, check if the piece should be promoted or capture again
 		"""
 
-		# Invalidate the caches
-		self.__correct_moves_cache.clear()
-		self.__game_state_cache = None
+		self.__invalidate_cache()
 
 		piece = self.__board[start]
 
@@ -330,12 +332,16 @@ class Board():
 	
 	@enable_update_should_capture.setter
 	def enable_update_should_capture(self, value: bool) -> None:
-		if not self.__enable_update_should_capture and value:
+		if value == self.__enable_update_should_capture:
+			return
+		
+		self.__enable_update_should_capture = value
+		self.__invalidate_cache()
+
+		if value:
 			self.__update_should_capture()
 		elif not value:
 			self.__should_capture = {1: False, -1: False}
-
-		self.__enable_update_should_capture = value
 
 	def __repr__(self) -> str:
 		ret = ""
