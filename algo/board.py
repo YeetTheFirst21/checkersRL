@@ -44,6 +44,9 @@ class _c:
 	def __repr__(self) -> str:
 		return f"({self.x}, {self.y})"
 
+	def tuple(self) -> tuple[int, int]:
+		return (self.x, self.y)
+
 class GameState(Enum):
 	NOT_OVER = 0
 	POSITIVE_WINS = 1
@@ -79,7 +82,7 @@ class Board():
 		self.__should_capture = {1: False, -1: False}
 		self.__enable_update_should_capture = True
 
-		self.__correct_moves_cache: dict[tuple[_c, _c], bool] = {}
+		self.__correct_moves_cache: dict[_c, dict[_c, bool]] = {}
 
 		self.__turn_sign = 1
 		self.__game_state_cache: Optional[GameState] = GameState.NOT_OVER
@@ -122,61 +125,30 @@ class Board():
 						continue
 					t = abs(piece)
 
-					# Simple piece
-					if t == 1:
-						for direction in simple_directions:
-							enemy_pos = pos + direction
-							empty_pos = enemy_pos + direction
-							if not (
-								self.__invalid(empty_pos) or \
-								not self.__empty(empty_pos) or \
-								not self.__enemy(pos, enemy_pos)
-							):
-								should_capture[sign] = True
-								break
-					
-					# King piece
-					elif t == 2:
-						for direction in self.__directions:
-							can_king_capture = False
-							next_next_pos = pos + direction
-							# We will iterate here until we reach the enemy and empty spot afterward
-							while True:
-								next_pos = next_next_pos
-								next_next_pos = next_pos + direction
-
-								# We are out of the board
-								if self.__invalid(next_next_pos):
-									break
-
-								# The fact that we are here means that we haven't met anyone yet, so just continue
-								if self.__empty(next_pos):
-									continue
-
-								# The fact that we are here means that next_pos is not empty
-								# So next_next_pos should be empty and the next_pos should be an enemy
-								can_king_capture = self.__empty(next_next_pos) and self.__enemy(pos, next_pos)
-								break
-
-							if can_king_capture:
-								should_capture[sign] = True
-								break
+					for direction in (simple_directions if t == 1 else self.__directions):
+						enemy_pos = pos + direction
+						empty_pos = enemy_pos + direction
+						if not (
+							self.__invalid(empty_pos) or \
+							not self.__empty(empty_pos) or \
+							not self.__enemy(pos, enemy_pos)
+						):
+							should_capture[sign] = True
+							break
 
 					if should_capture[sign]:
 						break
 
-	
-	def is_move_correct(self, start: tuple[int, int], end: tuple[int, int]) -> bool:
-		args = (_c(*start), _c(*end))
-		if args in self.__correct_moves_cache:
-			return self.__correct_moves_cache[args]
-		
-		ret = self.__compute_correct_move(*args)
-		self.__correct_moves_cache[args] = ret
-		return ret
-
 	def __compute_correct_move(self, s: _c, e: _c) -> bool:
 		if self.__invalid(s) or self.__empty(s) or self.__invalid(e) or not self.__empty(e):
+			return False
+		
+		piece = self.__board[*s]
+		t = abs(piece)
+		sign = _s(piece)
+
+		# Piece check
+		if t != 1 and t != 2:
 			return False
 		
 		# Diagonality check
@@ -185,113 +157,63 @@ class Board():
 			return False
 		
 		direction = delta.s()
-		piece = self.__board[*s]
-		t = abs(piece)
-		sign = _s(piece)
-
-		# Simple piece
-		if t == 1:
-			direction_index = self.__directions.index(direction)
-			# Incorrect direction
-			if (direction_index < 2) != (sign > 0):
-				return False
-			
-			# Non-capture move
-			next_pos = s + direction
-			if next_pos == e:
-				return not self.check_should_capture(sign)
-			
-			# Capture move
-			next_next_pos = next_pos + direction
-			if next_next_pos == e and self.__enemy(s, next_pos):
-				return True
-			
+		direction_index = self.__directions.index(direction)
+		# Incorrect direction, if it's a simple piece
+		if t == 1 and (direction_index < 2) != (sign > 0):
 			return False
 		
-		# King piece
-		elif t == 2:
-			cur_pos = s
-			found_enemy = False
-			# We will iterate here until we reach the end position
-			while cur_pos != e:
-				cur_pos += direction
+		# Non-capture move
+		next_pos = s + direction
+		if next_pos == e:
+			return not self.check_should_capture(sign)
+		
+		# Capture move
+		next_next_pos = next_pos + direction
+		if next_next_pos == e and self.__enemy(s, next_pos):
+			return True
+		
+		return False
+	
+	def __is_move_correct(self, s: _c, e: _c) -> bool:
+		if s in self.__correct_moves_cache and e in self.__correct_moves_cache[s]:
+			return self.__correct_moves_cache[s][e]
+	
+		ret = self.__compute_correct_move(s, e)
+		if s not in self.__correct_moves_cache:
+			self.__correct_moves_cache[s] = {e: ret}
+		else:
+			self.__correct_moves_cache[s][e] = ret
+		return ret
 
-				if self.__empty(cur_pos):
-					continue
+	def is_move_correct(self, start: tuple[int, int], end: tuple[int, int]) -> bool:
+		return self.__is_move_correct(_c(*start), _c(*end))
 
-				# The fact that we are here means that cur_pos is not empty
-				# Found enemy for the second time on the path or jumping over our piece
-				if found_enemy or not self.__enemy(s, cur_pos):
-					return False
-				
-				found_enemy = True
-			
-			# We should find enemy if we should capture, and vise versa
-			return found_enemy == self.check_should_capture(sign)
-
-		raise ValueError("Invalid piece on the board!")
-
-	def compute_correct_moves(self, start: tuple[int, int]) -> np.ndarray[tuple[int, int], np.dtype[np.bool]]:
+	def get_correct_moves(self, start: tuple[int, int]) -> set[tuple[int, int]]:
 		s = _c(*start)
-		ret = self.__invalid_board.copy()
 		if self.__invalid(s) or self.__empty(s):
-			return ret
+			return set()
 		
 		piece = self.__board[*s]
 		t = abs(piece)
 		sign = _s(piece)
 
-		# Simple piece
-		if t == 1:
-			for direction in self.__get_simple_directions(sign):
-				next_pos = s + direction
-				if self.__invalid(next_pos):
-					continue
-
-				if self.check_should_capture(sign):
-					# Capture move
-					next_next_pos = next_pos + direction
-					if not self.__enemy(s, next_pos) or self.__invalid(next_next_pos) or not self.__empty(next_next_pos):
-						continue
-					ret[*next_next_pos] = True
-				else:
-					# Simple move
-					if self.__empty(next_pos):
-						ret[*next_pos] = True
-						continue
-
-			return ret
+		if t != 1 and t != 2:
+			return set()
 		
-		# King piece
-		elif t == 2:
-			for direction in self.__directions:
-				cur_pos = s
-				found_enemy = False
-				# We will iterate here until we reach the edge of the board
-				while True:
-					cur_pos += direction
-					if self.__invalid(cur_pos):
-						break
+		ret = set()
+		for direction in (self.__get_simple_directions(sign) if t == 1 else self.__directions):
+			e = s + direction
 
-					if self.__empty(cur_pos):
-						# We should find enemy if we should capture, and vise versa
-						ret[*cur_pos] = found_enemy == self.check_should_capture(sign)
-						continue
-
-					# The fact that we are here means that cur_pos is not empty
-					if not self.__enemy(s, cur_pos):
-						# Jumping over our piece
-						break
-					else:
-						if found_enemy:
-							# Found enemy for the second time on the path
-							break
-						found_enemy = True
-						continue
+			# Moving a bit more forward, if there is an enemy
+			if self.__invalid(e):
+				continue
+			if self.__enemy(s, e):
+				e += direction
 			
-			return ret
-
-		raise ValueError("Invalid piece on the board!")
+			if self.__is_move_correct(s, e):
+				ret.add(e.tuple())
+		
+		return ret
 	
 	def __move_piece(self, start: tuple[int, int], end: tuple[int, int]) -> None:
 		"""
@@ -308,19 +230,9 @@ class Board():
 
 		if self.check_should_capture(_s(piece)):
 			# We should determine the enemy and capture
-			e = _c(*end)
 			s = _c(*start)
-			direction = (e - s).s()
-			next_pos = s
-			enemy_pos: Optional[_c] = None
-			while True:
-				next_pos += direction
-				if self.__invalid(next_pos):
-					break
-				if self.__enemy(s, next_pos):
-					enemy_pos = next_pos
-					break
-			assert enemy_pos is not None # We should have found the enemy, cos we have to capture now
+			enemy_pos = s + (_c(*end) - s).s()
+			assert self.__enemy(s, enemy_pos)
 			self.__board[enemy_pos.x, enemy_pos.y] = 0
 
 		# Move our piece
@@ -358,7 +270,7 @@ class Board():
 		# Change the turn
 		#    If we should and can capture with the same piece, we should not change the turn
 		if had_to_capture and self.check_should_capture(self.__turn_sign) and \
-				np.any(self.compute_correct_moves(end)):
+				self.get_correct_moves(end):
 			return True
 		
 		self.__turn_sign = -self.__turn_sign
@@ -402,7 +314,7 @@ class Board():
 			return GameState(turn_sign)
 		
 		for pos in turns_pieces:
-			if np.any(self.compute_correct_moves(pos)):
+			if self.get_correct_moves(pos):
 				return GameState.NOT_OVER
 		return GameState(-turn_sign)
 
@@ -439,5 +351,9 @@ class Board():
 	
 
 	# Debugging methods
-	def get_correct_moves_cache(self) -> dict[tuple[_c, _c], bool]:
-		return self.__correct_moves_cache
+	def get_correct_moves_cache(self) -> dict[tuple[tuple[int, int], tuple[int, int]], bool]:
+		return {
+			(s.tuple(), e.tuple()): v
+			for s in self.__correct_moves_cache
+			for e, v in self.__correct_moves_cache[s].items()
+		}

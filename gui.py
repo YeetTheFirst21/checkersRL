@@ -52,7 +52,7 @@ class ImageTexture:
 def on_pressed_tile(board: Board, pos: tuple[int, int]) -> None:
 	global selected_pos
 
-	if selected_pos and selected_pos[1][pos]:
+	if selected_pos and pos in selected_pos[1]:
 		_move_result = board.user_move(selected_pos[0], pos)
 		selected_pos = None
 		return
@@ -64,7 +64,7 @@ def on_pressed_tile(board: Board, pos: tuple[int, int]) -> None:
 
 	selected_pos = (
 		pos,
-		board.compute_correct_moves(pos)
+		board.get_correct_moves(pos)
 	)
 		
 
@@ -85,7 +85,7 @@ def draw_board(board: Board, pos: tuple[float, float], available_size: tuple[flo
 			imgui.set_cursor_pos_y(y_c)
 
 			# Highlighting valid moves with nice green
-			if selected_pos and selected_pos[1][pos]:
+			if selected_pos and pos in selected_pos[1]:
 				imgui.push_style_color(imgui.COLOR_BUTTON, 0.0, 0.5, 0.0, 1.0)
 				imgui.push_style_color(imgui.COLOR_BUTTON_HOVERED, 0.0, 0.5, 0.0, 0.6)
 				imgui.push_style_color(imgui.COLOR_BUTTON_ACTIVE, 0.0, 0.5, 0.0, 1.0)
@@ -135,7 +135,7 @@ def draw_board(board: Board, pos: tuple[float, float], available_size: tuple[flo
 
 selected_pos: Optional[tuple[
 	tuple[int, int],
-	np.ndarray
+	set[tuple[int, int]]
 ]]
 
 def main():
