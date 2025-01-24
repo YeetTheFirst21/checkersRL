@@ -49,12 +49,11 @@ class ImageTexture:
 			c_id = (gl.GLuint * 1) (self.texture_id)
 			gl.glDeleteTextures(1, c_id)
 
-
-def pressed_tile(board: Board, pos: tuple[int, int]) -> None:
+def on_pressed_tile(board: Board, pos: tuple[int, int]) -> None:
 	global selected_pos
 
 	if selected_pos and selected_pos[1][pos]:
-		board.make_move(selected_pos[0], pos)
+		_move_result = board.user_move(selected_pos[0], pos)
 		selected_pos = None
 		return
 
@@ -120,7 +119,7 @@ def draw_board(board: Board, pos: tuple[float, float], available_size: tuple[flo
 
 			if imgui.is_item_hovered():
 				if imgui.is_mouse_clicked():
-					pressed_tile(board, pos)
+					on_pressed_tile(board, pos)
 
 				with imgui.begin_tooltip():
 					imgui.text(f"pos: {pos}")
@@ -205,7 +204,7 @@ def main():
 			imgui.text(f"Should capture:\npositive: {board.check_should_capture(1)}\nnegative: {board.check_should_capture(-1)}")
 
 			imgui.separator()
-			imgui.text(f"Game state:\nif it's +1's turn: {board.get_game_state(1)}\nif it's -1's turn: {board.get_game_state(-1)}")
+			imgui.text(f"Game state: {board.game_state}")
 
 			imgui.separator()
 			imgui.text("Correct moves cache:")

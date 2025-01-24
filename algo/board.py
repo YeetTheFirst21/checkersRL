@@ -1,7 +1,10 @@
 import numpy as np
 
-from dataclasses import dataclass
 from typing import Optional
+from dataclasses import dataclass
+from enum import Enum
+
+from .iplayer import IPlayer
 
 def _s(x: int) -> int:
 	if x > 0:
@@ -41,6 +44,14 @@ class _c:
 	def __repr__(self) -> str:
 		return f"({self.x}, {self.y})"
 
+class GameState(Enum):
+	NOT_OVER = 0
+	POSITIVE_WINS = 1
+	NEGATIVE_WINS = -1
+
+	def __str__(self) -> str:
+		return self.name
+
 class Board():
 	SIZE = 6
 	TILING_PARITY = 0
@@ -69,7 +80,10 @@ class Board():
 		self.__enable_update_should_capture = True
 
 		self.__correct_moves_cache: dict[tuple[_c, _c], bool] = {}
-		self.__game_state_cache: dict[int, Optional[int]] = {}
+
+		self.__turn_sign = 1
+		self.__game_state_cache: Optional[GameState] = GameState.NOT_OVER
+		self.__players: dict[int, Optional[IPlayer]] = {1: None, -1: None}
 
 	def check_should_capture(self, sign: int) -> bool:
 		return self.__should_capture[sign]
@@ -279,16 +293,16 @@ class Board():
 
 		raise ValueError("Invalid piece on the board!")
 	
-	def make_move(self, start: tuple[int, int], end: tuple[int, int]) -> None:
+	def __move_piece(self, start: tuple[int, int], end: tuple[int, int]) -> None:
 		"""
-		**Warning**: No checks are performed!
+		**Warning**: No checks are performed and no turn change is made!
 
 		Would update the board state, check if the piece should be promoted or capture again
 		"""
 
 		# Invalidate the caches
 		self.__correct_moves_cache.clear()
-		self.__game_state_cache.clear()
+		self.__game_state_cache = None
 
 		piece = self.__board[start]
 
@@ -323,22 +337,55 @@ class Board():
 		if self.__enable_update_should_capture:
 			self.__update_should_capture()
 
-	def get_game_state(self, turn_sign: int) -> Optional[int]:
+	def user_move(self, start: tuple[int, int], end: tuple[int, int]) -> bool:
+		"""
+		**Warning**: It is not checked whether the move is correct or not.
+
+		Would update the board state, check if it's user's turn and
+		 	if the piece should be promoted or capture again
+			
+		Returns:
+			True if the move was successful, False otherwise
+		"""
+
+		# Check if it's the user's turn
+		if self.__players[self.__turn_sign] is not None or _s(self.__board[start]) != self.__turn_sign:
+			return False
+		
+		had_to_capture = self.check_should_capture(self.__turn_sign)
+		self.__move_piece(start, end)
+
+		# Change the turn
+		#    If we should and can capture with the same piece, we should not change the turn
+		if had_to_capture and self.check_should_capture(self.__turn_sign) and \
+				np.any(self.compute_correct_moves(end)):
+			return True
+		
+		self.__turn_sign = -self.__turn_sign
+		return True
+
+	@property
+	def game_state(self) -> GameState:
 		"""
 		Returns:
 			1 if positive player wins, -1 if negative player wins, None if the game is not over
 		"""
-		if turn_sign in self.__game_state_cache:
-			return self.__game_state_cache[turn_sign]
+		if self.__game_state_cache:
+			return self.__game_state_cache
 		
-		ret = self.__compute_game_state(turn_sign)
-		self.__game_state_cache[turn_sign] = ret
+		ret = self.__compute_game_state()
+		self.__game_state_cache = ret
 		return ret
 
-	def __compute_game_state(self, turn_sign: int) -> Optional[int]:
+	@property
+	def turn_sign(self) -> int:
+		return self.__turn_sign
+
+	def __compute_game_state(self) -> GameState:
 		"""
 		1 if positive player wins, -1 if negative player wins, None if the game is not over
 		"""
+		turn_sign = self.__turn_sign
 		turns_pieces: list[tuple[int, int]] = []
 		opp_turn_has_pieces = False
 		for x in range(6):
@@ -350,19 +397,20 @@ class Board():
 					opp_turn_has_pieces = True
 		
 		if not turns_pieces:
-			return -turn_sign
+			return GameState(-turn_sign)
 		elif not opp_turn_has_pieces:
-			return turn_sign
+			return GameState(turn_sign)
 		
 		for pos in turns_pieces:
 			if np.any(self.compute_correct_moves(pos)):
-				return None
-		return -turn_sign
+				return GameState.NOT_OVER
+		return GameState(-turn_sign)
 
 	def __getitem__(self, pos: _c | tuple[int, int]) -> int:
 		return self.__board[pos[0], pos[1]]
 
-	def get_board(self) -> np.ndarray[tuple[int, int], np.dtype[np.int8]]:
+	@property
+	def board(self) -> np.ndarray[tuple[int, int], np.dtype[np.int8]]:
 		return self.__board.copy()
 
 	def is_valid_pos(self, pos: tuple[int, int]) -> bool:
