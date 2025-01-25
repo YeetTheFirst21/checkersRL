@@ -15,6 +15,7 @@ import json
 from collections.abc import Callable
 from dataclasses import dataclass
 import threading
+from math import exp
 
 import algo.board
 from algo.board import Board
@@ -131,7 +132,7 @@ class UIState:
 		self.worker_thread_event = threading.Event()
 		self.worker_thread_is_running = True
 		self.worker_thread_is_working = False
-		self.worker_thread_delay = 1e-3
+		self.worker_thread_delay = .7
 		self.worker_thread = threading.Thread(
 			target=self.worker_thread_function,
 			daemon=True
@@ -206,7 +207,8 @@ class UIState:
 				
 				self.board.make_move(start, end)
 
-				sleep(self.worker_thread_delay)
+				if self.worker_thread_delay:
+					sleep(1e-3 * (exp(self.worker_thread_delay) - 1))
 			
 			self.worker_thread_is_working = False
 	
@@ -314,7 +316,7 @@ def main():
 		# Board window
 		# https://github.com/ocornut/imgui/issues/6872
 		imgui.begin(f"Board - {turn_name} turn###Board", False, imgui.WINDOW_NO_COLLAPSE)
-		imgui.set_window_size(500, 500)
+		imgui.set_window_size(600, 600)
 		imgui.set_window_position(10, 50, imgui.ONCE)
 		draw_board(
 			state,
@@ -332,7 +334,7 @@ def main():
 		# Settings window
 		if state.show_settings:
 			_, state.show_settings = imgui.begin("Properties", True, imgui.WINDOW_NO_COLLAPSE)
-			imgui.set_window_size(400, 500)
+			imgui.set_window_size(500, 600)
 			imgui.set_window_position(510, 50, imgui.APPEARING)
 
 			if imgui.button("Reset board"):
@@ -359,6 +361,10 @@ def main():
 
 			_, state.automatic_computer_step = imgui.checkbox(
 				"Automatic computer step", state.automatic_computer_step)
+
+			imgui.set_next_item_width(imgui.get_content_region_available_width() * 0.4)
+			_, state.worker_thread_delay = imgui.slider_float(
+				"Computer step delay", state.worker_thread_delay, 0, 5)
 
 			# Players selection
 			imgui.separator()
