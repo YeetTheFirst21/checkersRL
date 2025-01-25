@@ -49,6 +49,7 @@ class GameState(Enum):
 	NOT_OVER = 0
 	POSITIVE_WINS = 1
 	NEGATIVE_WINS = -1
+	DRAW = -2
 
 	def __str__(self) -> str:
 		return self.name
@@ -56,6 +57,7 @@ class GameState(Enum):
 class Board():
 	SIZE = 6
 	TILING_PARITY = 0
+	DRAW_NON_CAPTURE_MOVES = 50
 	__directions = [
 		_c(-1, -1),
 		_c(1, -1),
@@ -75,6 +77,7 @@ class Board():
 
 		self.__should_capture = {1: False, -1: False}
 		self.__enable_update_should_capture = True
+		self.__moves_since_last_capture = 0
 
 		self.__correct_moves_cache: dict[_c, dict[_c, bool]] = {}
 
@@ -232,6 +235,10 @@ class Board():
 			assert self.__enemy(s, enemy_pos)
 			self.__board[enemy_pos.x, enemy_pos.y] = 0
 
+			self.__moves_since_last_capture = 0
+		else:
+			self.__moves_since_last_capture += 1
+
 		# Move our piece
 		self.__board[end] = piece
 		self.__board[start] = 0
@@ -257,10 +264,6 @@ class Board():
 
 	@property
 	def game_state(self) -> GameState:
-		"""
-		Returns:
-			1 if positive player wins, -1 if negative player wins, None if the game is not over
-		"""
 		if self.__game_state_cache:
 			return self.__game_state_cache
 		
@@ -271,11 +274,15 @@ class Board():
 	@property
 	def turn_sign(self) -> int:
 		return self.__turn_sign
+	
+	@property
+	def moves_since_last_capture(self) -> int:
+		return self.__moves_since_last_capture
 
 	def __compute_game_state(self) -> GameState:
-		"""
-		1 if positive player wins, -1 if negative player wins, None if the game is not over
-		"""
+		if self.__moves_since_last_capture >= self.DRAW_NON_CAPTURE_MOVES:
+			return GameState.DRAW
+
 		turn_sign = self.__turn_sign
 		turns_pieces: list[tuple[int, int]] = []
 		opp_turn_has_pieces = False
