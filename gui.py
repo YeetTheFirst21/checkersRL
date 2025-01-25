@@ -14,6 +14,7 @@ from time import sleep
 import json
 from collections.abc import Callable
 from dataclasses import dataclass
+import threading
 
 import algo.board
 from algo.board import Board
@@ -112,6 +113,7 @@ class UIState:
 			1: ImageTexture("./icons/positive_simple.png"),
 			2: ImageTexture("./icons/positive_king.png"),
 		}
+		self.popup_content: str = ""
 
 		self.automatic_computer_step: bool = True
 
@@ -125,6 +127,17 @@ class UIState:
 			iplayer.UserInput(),
 			iplayer.RandomPlayer(0)
 		]
+
+		self.worker_thread_event = threading.Event()
+		self.worker_thread_is_running = True
+		self.worker_thread_is_working = False
+		self.worker_thread_delay = 1e-3
+		self.worker_thread = threading.Thread(
+			target=self.worker_thread_function,
+			daemon=True
+		)
+		self.worker_thread.start()
+
 		self.board: Board
 		self.reset_board()
 
@@ -149,7 +162,10 @@ class UIState:
 			not isinstance(self.get_player(self.board.turn_sign), iplayer.UserInput)
 
 	# Handlers
-	def on_pressed_tile(self, pos: tuple[int, int]) -> None:
+	def on_pressed_tile(self, pos: tuple[int, int]) -> Optional[str]:
+		if self.worker_thread_event.is_set():
+			return "Computer is currently thinking..."
+
 		if not self.waiting_user_input:
 			return
 
@@ -158,7 +174,7 @@ class UIState:
 			self.selected_pos = None
 
 			if self.automatic_computer_step and not self.waiting_user_input:
-				self.on_computer_step()
+				self.worker_thread_event.set()
 
 			return
 
@@ -173,15 +189,33 @@ class UIState:
 			pos,
 			self.board.get_correct_moves(pos)
 		)
-	
-	def on_computer_step(self) -> None:
-		self.selected_pos = None
 
-		while self.can_do_computer_step:
-			start, end = self.players[self.player_i[self.board.turn_sign]].decide_move(
-				self.board, self.board.turn_sign)
+	def worker_thread_function(self) -> None:
+		while self.worker_thread_event.wait():
+			self.worker_thread_event.clear()
+
+			if not self.worker_thread_is_running:
+				return
+
+			self.selected_pos = None
+
+			self.worker_thread_is_working = True
+			while self.worker_thread_is_working and self.can_do_computer_step:
+				start, end = self.players[self.player_i[self.board.turn_sign]].decide_move(
+					self.board, self.board.turn_sign)
+				
+				self.board.make_move(start, end)
+
+				sleep(self.worker_thread_delay)
 			
-			self.board.make_move(start, end)
+			self.worker_thread_is_working = False
+	
+	def __del__(self) -> None:
+		self.worker_thread_is_running = False
+		self.worker_thread_pause_requested = True
+		self.worker_thread_event.set()
+		self.worker_thread.join()
+		
 
 def draw_board(state: UIState, pos: tuple[float, float], available_size: tuple[float, float], gap_portion: float = 0.07) -> None:
 	used_size = min(available_size)
@@ -236,7 +270,10 @@ def draw_board(state: UIState, pos: tuple[float, float], available_size: tuple[f
 
 			if imgui.is_item_hovered():
 				if imgui.is_mouse_clicked():
-					state.on_pressed_tile(pos)
+					res = state.on_pressed_tile(pos)
+					if res:
+						state.popup_content = res
+						imgui.open_popup("Error!")
 
 				with imgui.begin_tooltip():
 					imgui.text(f"pos: {pos}")
@@ -248,6 +285,12 @@ def draw_board(state: UIState, pos: tuple[float, float], available_size: tuple[f
 
 		y_c += size + gap
 		x_c = x_s
+	
+	if imgui.begin_popup_modal("Error!").opened:
+		imgui.text(state.popup_content)
+		if imgui.button("OK"):
+			imgui.close_current_popup()
+		imgui.end_popup()
 
 
 def main():
@@ -300,10 +343,19 @@ def main():
 
 			imgui.separator()
 			imgui.text(f"{state.board.game_state}, turn: {turn_name}")
+			imgui.text(f"Turns without captures: {state.board.moves_since_last_capture}")
 
-			with disabled_block(not state.can_do_computer_step):
+			imgui.separator()
+			imgui.text(f"Computer working: {state.worker_thread_is_working}")
+
+			with disabled_block(state.worker_thread_is_working or not state.can_do_computer_step):
 				if imgui.button("Computer step"):
-					state.on_computer_step()
+					state.worker_thread_event.set()
+			
+			with disabled_block(not state.worker_thread_is_working):
+				imgui.same_line()
+				if imgui.button("Stop computer"):
+					state.worker_thread_is_working = False
 
 			_, state.automatic_computer_step = imgui.checkbox(
 				"Automatic computer step", state.automatic_computer_step)
