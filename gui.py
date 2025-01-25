@@ -20,6 +20,7 @@ from dataclasses import dataclass
 
 import algo.board
 from algo.board import Board
+import algo.iplayer as iplayer
 
 
 CUR_DIR = pathlib.Path(__file__).parent.resolve().absolute()
@@ -85,8 +86,41 @@ class UIState:
 			set[tuple[int, int]]
 		]] = None
 
-		self.board: Board = Board()
+		self.__positive_player_i = 0
+		self.__negative_player_i = 0
+		user_input = iplayer.UserInput()
+		self.players: list[iplayer.IPlayer] = [
+			user_input
+		]
+		self.board: Board
+		self.reset_board()
 
+	def reset_board(self) -> None:
+		self.board = Board(
+			self.players[self.__positive_player_i],
+			self.players[self.__negative_player_i]
+		)
+
+	# Players selection
+	@property
+	def positive_player_i(self) -> int:
+		return self.__positive_player_i
+	
+	@positive_player_i.setter
+	def positive_player_i(self, value: int) -> None:
+		self.__positive_player_i = value
+		self.board.players[1] = self.players[value]
+
+	@property
+	def negative_player_i(self) -> int:
+		return self.__negative_player_i
+	
+	@negative_player_i.setter
+	def negative_player_i(self, value: int) -> None:
+		self.__negative_player_i = value
+		self.board.players[-1] = self.players[value]
+
+	# Handlers
 	def on_pressed_tile(self, pos: tuple[int, int]) -> None:
 		if self.selected_pos and pos in self.selected_pos[1]:
 			_move_result = self.board.user_move(self.selected_pos[0], pos)
@@ -220,7 +254,7 @@ def main():
 			imgui.set_window_position(510, 50, imgui.APPEARING)
 
 			if imgui.button("Reset board"):
-				state.board = Board()
+				state.reset_board()
 
 			_, state.board.enable_update_should_capture = imgui.checkbox(
 				"Enable should capture rule", state.board.enable_update_should_capture)
@@ -231,6 +265,8 @@ def main():
 			# Players selection
 			imgui.separator()
 			with imgui.begin_table("Players selection", 2):
+				player_names = [str(player) for player in state.players]
+
 				imgui.table_next_row()
 				imgui.table_next_column()
 				imgui.text("Positive:")
@@ -239,7 +275,24 @@ def main():
 
 				imgui.table_next_row()
 				imgui.table_next_column()
-				# imgui.com
+				imgui.set_next_item_width(-1)
+				changed, new_val = imgui.combo(
+					"##Positive player",
+					state.positive_player_i,
+					player_names
+				)
+				if changed:
+					state.positive_player_i = new_val
+				
+				imgui.table_next_column()
+				imgui.set_next_item_width(-1)
+				changed, new_val = imgui.combo(
+					"##Negative player",
+					state.negative_player_i,
+					player_names
+				)
+				if changed:
+					state.negative_player_i = new_val
 			
 			imgui.separator()
 			imgui.text(f"Board state:\n{state.board}")

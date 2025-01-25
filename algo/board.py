@@ -4,7 +4,7 @@ from typing import Optional
 from dataclasses import dataclass
 from enum import Enum
 
-from .iplayer import IPlayer
+from .iplayer import *
 
 def _s(x: int) -> int:
 	if x > 0:
@@ -65,7 +65,7 @@ class Board():
 		_c(-1, 1)
 	]
 	
-	def __init__(self) -> None:
+	def __init__(self, positive_player: IPlayer, negative_player: IPlayer) -> None:
 		self.__board: np.ndarray[tuple[int, int], np.dtype[np.int8]] = np.array([
 			[-1, 0, -1, 0, -1, 0],
 			[0, -1, 0, -1, 0, -1],
@@ -82,7 +82,10 @@ class Board():
 
 		self.__turn_sign = 1
 		self.__game_state_cache: Optional[GameState] = GameState.NOT_OVER
-		self.__players: dict[int, Optional[IPlayer]] = {1: None, -1: None}
+		self.players: dict[int, IPlayer] = {
+			1: positive_player,
+			-1: negative_player
+		}
 
 	def check_should_capture(self, sign: int) -> bool:
 		return self.__should_capture[sign]
@@ -259,7 +262,8 @@ class Board():
 		"""
 
 		# Check if it's the user's turn
-		if self.__players[self.__turn_sign] is not None or _s(self.__board[start]) != self.__turn_sign:
+		if not isinstance(self.players[self.__turn_sign], UserInput) or \
+				_s(self.__board[start]) != self.__turn_sign:
 			return False
 		
 		had_to_capture = self.check_should_capture(self.__turn_sign)
