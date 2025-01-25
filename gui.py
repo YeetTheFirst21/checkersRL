@@ -87,6 +87,21 @@ class ImageTexture:
 		self.__remove_texture(self.enabled_texture_id)
 		self.__remove_texture(self.disabled_texture_id)
 
+class disabled_block:
+	# https://github.com/ocornut/imgui/issues/1889#issuecomment-398681105
+	def __init__(self, is_disabled = True) -> None:
+		self.is_disabled = is_disabled
+
+	def __enter__(self) -> None:
+		if self.is_disabled:
+			imgui.internal.push_item_flag(imgui.internal.ITEM_DISABLED, self.is_disabled)
+			imgui.push_style_var(imgui.STYLE_ALPHA, 0.5)
+	
+	def __exit__(self, exc_type, exc_value, traceback) -> None:
+		if self.is_disabled:
+			imgui.pop_style_var()
+			imgui.internal.pop_item_flag()
+
 class UIState:
 	def __init__(self) -> None:
 		self.show_settings: bool = True
@@ -103,11 +118,10 @@ class UIState:
 			set[tuple[int, int]]
 		]] = None
 
-		self.positive_player_i = 0
-		self.negative_player_i = 0
-		user_input = iplayer.UserInput()
+		self.player_i: dict[int, int] = { 1: 0, -1: 0 }
 		self.players: list[iplayer.IPlayer] = [
-			user_input
+			iplayer.UserInput(),
+			iplayer.RandomPlayer(0)
 		]
 		self.board: Board
 		self.reset_board()
@@ -115,8 +129,25 @@ class UIState:
 	def reset_board(self) -> None:
 		self.board = Board()
 
+	@property
+	def game_is_going(self) -> bool:
+		return self.board.game_state == algo.board.GameState.NOT_OVER
+
+	@property
+	def waiting_user_input(self) -> bool:
+		return self.game_is_going and \
+			isinstance(self.players[self.player_i[self.board.turn_sign]], iplayer.UserInput)
+	
+	@property
+	def can_do_computer_step(self) -> bool:
+		return self.game_is_going and \
+			not isinstance(self.players[self.player_i[self.board.turn_sign]], iplayer.UserInput)
+
 	# Handlers
 	def on_pressed_tile(self, pos: tuple[int, int]) -> None:
+		if not self.waiting_user_input:
+			return
+
 		if self.selected_pos and pos in self.selected_pos[1]:
 			self.board.make_move(self.selected_pos[0], pos)
 			self.selected_pos = None
@@ -133,7 +164,14 @@ class UIState:
 			pos,
 			self.board.get_correct_moves(pos)
 		)
+	
+	def on_computer_step(self) -> None:
+		self.selected_pos = None
+
+		start, end = self.players[self.player_i[self.board.turn_sign]].decide_move(
+			self.board, self.board.turn_sign)
 		
+		self.board.make_move(start, end)
 
 def draw_board(state: UIState, pos: tuple[float, float], available_size: tuple[float, float], gap_portion: float = 0.07) -> None:
 	used_size = min(available_size)
@@ -179,13 +217,9 @@ def draw_board(state: UIState, pos: tuple[float, float], available_size: tuple[f
 			if piece == 0:
 				imgui.image_button(state.textures[0].enabled_texture_id, size - 2, size)
 			else:
-				if state.board.get_correct_moves(pos) and sign == state.board.turn_sign:
+				if sign == state.board.turn_sign and state.waiting_user_input and state.board.get_correct_moves(pos):
 					imgui.image_button(state.textures[piece].enabled_texture_id, size - 2, size)
 				else:
-					# imgui.push_style_var(imgui.STYLE_ALPHA, 0.5)
-					# imgui.image_button(textures[piece].texture_id, size - 2, size)
-					# imgui.pop_style_var(1)
-
 					imgui.image_button(state.textures[piece].disabled_texture_id, size - 2, size)
 			
 			imgui.pop_style_color(3)
@@ -257,8 +291,11 @@ def main():
 			imgui.separator()
 			imgui.text(f"{state.board.game_state}, turn: {turn_name}")
 
+			with disabled_block(not state.can_do_computer_step):
+				if imgui.button("Computer step"):
+					state.on_computer_step()
+
 			# Players selection
-			imgui.separator()
 			with imgui.begin_table("Players selection", 2):
 				player_names = [str(player) for player in state.players]
 
@@ -269,25 +306,16 @@ def main():
 				imgui.text("Negative:")
 
 				imgui.table_next_row()
-				imgui.table_next_column()
-				imgui.set_next_item_width(-1)
-				changed, new_val = imgui.combo(
-					"##Positive player",
-					state.positive_player_i,
-					player_names
-				)
-				if changed:
-					state.positive_player_i = new_val
-				
-				imgui.table_next_column()
-				imgui.set_next_item_width(-1)
-				changed, new_val = imgui.combo(
-					"##Negative player",
-					state.negative_player_i,
-					player_names
-				)
-				if changed:
-					state.negative_player_i = new_val
+				for i in [1, -1]:
+					imgui.table_next_column()
+					imgui.set_next_item_width(-1)
+					changed, new_val = imgui.combo(
+						f"##{i} player",
+						state.player_i[i],
+						player_names
+					)
+					if changed:
+						state.player_i[i] = new_val
 			
 			imgui.separator()
 			imgui.text(f"Board state:\n{state.board}")
