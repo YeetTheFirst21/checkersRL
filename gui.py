@@ -20,6 +20,7 @@ from math import exp
 import algo.board
 from algo.board import Board
 import algo.iplayer as iplayer
+import algo.dynamicProgramming as dp
 
 
 CUR_DIR = pathlib.Path(__file__).parent.resolve().absolute()
@@ -126,7 +127,8 @@ class UIState:
 		self.player_i: dict[int, int] = { 1: 0, -1: 0 }
 		self.players: list[iplayer.IPlayer] = [
 			iplayer.UserInput(),
-			iplayer.RandomPlayer(0)
+			iplayer.RandomPlayer(0),
+			dp.dynamicPlayer(startFresh=True)
 		]
 
 		self.worker_thread_event = threading.Event()
