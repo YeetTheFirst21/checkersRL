@@ -113,6 +113,8 @@ class UIState:
 			2: ImageTexture("./icons/positive_king.png"),
 		}
 
+		self.automatic_computer_step: bool = True
+
 		self.selected_pos: Optional[tuple[
 			tuple[int, int],
 			set[tuple[int, int]]
@@ -129,6 +131,9 @@ class UIState:
 	def reset_board(self) -> None:
 		self.board = Board()
 
+	def get_player(self, sign: int) -> iplayer.IPlayer:
+		return self.players[self.player_i[sign]]
+
 	@property
 	def game_is_going(self) -> bool:
 		return self.board.game_state == algo.board.GameState.NOT_OVER
@@ -136,12 +141,12 @@ class UIState:
 	@property
 	def waiting_user_input(self) -> bool:
 		return self.game_is_going and \
-			isinstance(self.players[self.player_i[self.board.turn_sign]], iplayer.UserInput)
+			isinstance(self.get_player(self.board.turn_sign), iplayer.UserInput)
 	
 	@property
 	def can_do_computer_step(self) -> bool:
 		return self.game_is_going and \
-			not isinstance(self.players[self.player_i[self.board.turn_sign]], iplayer.UserInput)
+			not isinstance(self.get_player(self.board.turn_sign), iplayer.UserInput)
 
 	# Handlers
 	def on_pressed_tile(self, pos: tuple[int, int]) -> None:
@@ -151,6 +156,10 @@ class UIState:
 		if self.selected_pos and pos in self.selected_pos[1]:
 			self.board.make_move(self.selected_pos[0], pos)
 			self.selected_pos = None
+
+			if self.automatic_computer_step and not self.waiting_user_input:
+				self.on_computer_step()
+
 			return
 
 		if not self.board.is_valid_pos(pos) or not self.board[pos] or \
@@ -168,10 +177,11 @@ class UIState:
 	def on_computer_step(self) -> None:
 		self.selected_pos = None
 
-		start, end = self.players[self.player_i[self.board.turn_sign]].decide_move(
-			self.board, self.board.turn_sign)
-		
-		self.board.make_move(start, end)
+		while self.can_do_computer_step:
+			start, end = self.players[self.player_i[self.board.turn_sign]].decide_move(
+				self.board, self.board.turn_sign)
+			
+			self.board.make_move(start, end)
 
 def draw_board(state: UIState, pos: tuple[float, float], available_size: tuple[float, float], gap_portion: float = 0.07) -> None:
 	used_size = min(available_size)
@@ -295,7 +305,11 @@ def main():
 				if imgui.button("Computer step"):
 					state.on_computer_step()
 
+			_, state.automatic_computer_step = imgui.checkbox(
+				"Automatic computer step", state.automatic_computer_step)
+
 			# Players selection
+			imgui.separator()
 			with imgui.begin_table("Players selection", 2):
 				player_names = [str(player) for player in state.players]
 
@@ -316,6 +330,12 @@ def main():
 					)
 					if changed:
 						state.player_i[i] = new_val
+
+			if isinstance(state.get_player(1), iplayer.RandomPlayer) or \
+					isinstance(state.get_player(-1), iplayer.RandomPlayer):
+				random_player: iplayer.RandomPlayer = state.players[1] # type: ignore
+				imgui.set_next_item_width(imgui.get_content_region_available_width() * 0.4)
+				_, random_player.seed = imgui.input_int("Random player seed", random_player.seed)
 			
 			imgui.separator()
 			imgui.text(f"Board state:\n{state.board}")
