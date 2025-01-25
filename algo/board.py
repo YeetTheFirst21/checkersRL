@@ -136,7 +136,7 @@ class Board():
 		if self.__invalid(s) or self.__empty(s) or self.__invalid(e) or not self.__empty(e):
 			return False
 		
-		piece = self.__board[*s]
+		piece = self.__board[s.tuple()]
 		t = abs(piece)
 		sign = _s(piece)
 
@@ -186,7 +186,7 @@ class Board():
 		if self.__invalid(s) or self.__empty(s):
 			return set()
 		
-		piece = self.__board[*s]
+		piece = self.__board[s.tuple()]
 		t = abs(piece)
 		sign = _s(piece)
 

@@ -1,6 +1,6 @@
 # romaAI
 RL to play American checkers;
-The used stack is Python + pyimgui(imgui[glfw]) + NumPy
+The used stack is Python (3.10+) + pyimgui(imgui[glfw]) + NumPy
 
 #### The rules of American checkers ([YT video](https://youtu.be/ScKIdStgAfU)) ([a better rule source](https://checkers.online/magazine/game/american-checkers-rules)):
 1. Board size is 6x6
