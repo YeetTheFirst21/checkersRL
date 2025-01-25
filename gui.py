@@ -1,12 +1,9 @@
 # Src: https://github.com/pyimgui/pyimgui/blob/master/doc/examples/plots.py
 
-import PIL.Image
-import PIL.ImageFile
 import glfw
 import OpenGL.GL as gl
 import imgui
 from imgui.integrations.glfw import GlfwRenderer
-import PIL
 from PIL import Image
 import numpy as np
 
@@ -50,25 +47,45 @@ class ImageTexture:
 
 	def __init__(self, path: str) -> None:
 		full_path = (CUR_DIR / path).resolve().absolute()
-		self.texture_id: Optional[int] = self.__load_image(full_path)
 
+		def enabled_filter(image: Image.Image) -> Image.Image:
+			with_outline = Image.new("RGBA", image.size, (0, 0, 0, 0))
+			with_outline.paste(
+				Image.new("RGBA", image.size, (255, 244, 161, 255)),
+				mask=image
+			)
 
-		def reduce_alpha(image: Image.Image) -> Image.Image:
-			# https://stackoverflow.com/a/72983761/8302811
-			im2 = image.copy()
-			im2.putalpha(160)
-			image.paste(im2, image)
-			return image
+			scale_factor = 1.1
+			with_outline = with_outline.resize(
+				(int(image.width * scale_factor), int(image.height * scale_factor)),
+				Image.Resampling.BICUBIC
+			)
+
+			with_outline.paste(
+				image,
+				(
+					(with_outline.width - image.width) // 2,
+					(with_outline.height - image.height) // 2
+				),
+				image
+			)
+			return with_outline
 		
-		self.disabled_texture_id: Optional[int] = self.__load_image(
-			full_path, reduce_alpha)
+		self.enabled_texture_id: Optional[int] = self.__load_image(
+			full_path, enabled_filter)
 
+		self.disabled_texture_id: Optional[int] = self.__load_image(full_path)
+
+	@staticmethod
+	def __remove_texture(texture_id: Optional[int]) -> None:
+		if texture_id is not None and gl.glIsTexture(texture_id):
+			# https://stackoverflow.com/a/60352108/8302811
+			c_id = (gl.GLuint * 1) (texture_id)
+			gl.glDeleteTextures(1, c_id)
 
 	def __del__(self) -> None:
-		if self.texture_id is not None and gl.glIsTexture(self.texture_id):
-			# https://stackoverflow.com/a/60352108/8302811
-			c_id = (gl.GLuint * 1) (self.texture_id)
-			gl.glDeleteTextures(1, c_id)
+		self.__remove_texture(self.enabled_texture_id)
+		self.__remove_texture(self.disabled_texture_id)
 
 class UIState:
 	def __init__(self) -> None:
@@ -86,8 +103,8 @@ class UIState:
 			set[tuple[int, int]]
 		]] = None
 
-		self.__positive_player_i = 0
-		self.__negative_player_i = 0
+		self.positive_player_i = 0
+		self.negative_player_i = 0
 		user_input = iplayer.UserInput()
 		self.players: list[iplayer.IPlayer] = [
 			user_input
@@ -96,34 +113,12 @@ class UIState:
 		self.reset_board()
 
 	def reset_board(self) -> None:
-		self.board = Board(
-			self.players[self.__positive_player_i],
-			self.players[self.__negative_player_i]
-		)
-
-	# Players selection
-	@property
-	def positive_player_i(self) -> int:
-		return self.__positive_player_i
-	
-	@positive_player_i.setter
-	def positive_player_i(self, value: int) -> None:
-		self.__positive_player_i = value
-		self.board.players[1] = self.players[value]
-
-	@property
-	def negative_player_i(self) -> int:
-		return self.__negative_player_i
-	
-	@negative_player_i.setter
-	def negative_player_i(self, value: int) -> None:
-		self.__negative_player_i = value
-		self.board.players[-1] = self.players[value]
+		self.board = Board()
 
 	# Handlers
 	def on_pressed_tile(self, pos: tuple[int, int]) -> None:
 		if self.selected_pos and pos in self.selected_pos[1]:
-			_move_result = self.board.user_move(self.selected_pos[0], pos)
+			self.board.make_move(self.selected_pos[0], pos)
 			self.selected_pos = None
 			return
 
@@ -182,10 +177,10 @@ def draw_board(state: UIState, pos: tuple[float, float], available_size: tuple[f
 				imgui.push_style_color(imgui.COLOR_BUTTON_ACTIVE, 0.87, 0.72, 0.53, 1.0)
 
 			if piece == 0:
-				imgui.image_button(state.textures[0].texture_id, size - 2, size)
+				imgui.image_button(state.textures[0].enabled_texture_id, size - 2, size)
 			else:
 				if state.board.get_correct_moves(pos) and sign == state.board.turn_sign:
-					imgui.image_button(state.textures[piece].texture_id, size - 2, size)
+					imgui.image_button(state.textures[piece].enabled_texture_id, size - 2, size)
 				else:
 					# imgui.push_style_var(imgui.STYLE_ALPHA, 0.5)
 					# imgui.image_button(textures[piece].texture_id, size - 2, size)

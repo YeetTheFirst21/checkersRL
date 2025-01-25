@@ -4,8 +4,6 @@ from typing import Optional
 from dataclasses import dataclass
 from enum import Enum
 
-from .iplayer import *
-
 def _s(x: int) -> int:
 	if x > 0:
 		return 1
@@ -65,7 +63,7 @@ class Board():
 		_c(-1, 1)
 	]
 	
-	def __init__(self, positive_player: IPlayer, negative_player: IPlayer) -> None:
+	def __init__(self) -> None:
 		self.__board: np.ndarray[tuple[int, int], np.dtype[np.int8]] = np.array([
 			[-1, 0, -1, 0, -1, 0],
 			[0, -1, 0, -1, 0, -1],
@@ -82,10 +80,6 @@ class Board():
 
 		self.__turn_sign = 1
 		self.__game_state_cache: Optional[GameState] = GameState.NOT_OVER
-		self.players: dict[int, IPlayer] = {
-			1: positive_player,
-			-1: negative_player
-		}
 
 	def check_should_capture(self, sign: int) -> bool:
 		return self.__should_capture[sign]
@@ -218,18 +212,20 @@ class Board():
 		self.__correct_moves_cache.clear()
 		self.__game_state_cache = None
 
-	def __move_piece(self, start: tuple[int, int], end: tuple[int, int]) -> None:
+	def make_move(self, start: tuple[int, int], end: tuple[int, int]) -> None:
 		"""
 		**Warning**: No checks are performed and no turn change is made!
 
 		Would update the board state, check if the piece should be promoted or capture again
 		"""
 
+		had_to_capture = self.check_should_capture(self.__turn_sign)
+		
 		self.__invalidate_cache()
 
 		piece = self.__board[start]
 
-		if self.check_should_capture(_s(piece)):
+		if had_to_capture:
 			# We should determine the enemy and capture
 			s = _c(*start)
 			enemy_pos = s + (_c(*end) - s).s()
@@ -250,33 +246,14 @@ class Board():
 		if self.__enable_update_should_capture:
 			self.__update_should_capture()
 
-	def user_move(self, start: tuple[int, int], end: tuple[int, int]) -> bool:
-		"""
-		**Warning**: It is not checked whether the move is correct or not.
-
-		Would update the board state, check if it's user's turn and
-		 	if the piece should be promoted or capture again
-			
-		Returns:
-			True if the move was successful, False otherwise
-		"""
-
-		# Check if it's the user's turn
-		if not isinstance(self.players[self.__turn_sign], UserInput) or \
-				_s(self.__board[start]) != self.__turn_sign:
-			return False
-		
-		had_to_capture = self.check_should_capture(self.__turn_sign)
-		self.__move_piece(start, end)
-
 		# Change the turn
 		#    If we should and can capture with the same piece, we should not change the turn
 		if had_to_capture and self.check_should_capture(self.__turn_sign) and \
 				self.get_correct_moves(end):
-			return True
+			return
 		
+		# 	Otherwise, change the turn
 		self.__turn_sign = -self.__turn_sign
-		return True
 
 	@property
 	def game_state(self) -> GameState:
