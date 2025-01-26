@@ -145,6 +145,7 @@ class UIState:
 		self.reset_board()
 
 	def reset_board(self) -> None:
+		self.selected_pos = None
 		self.board = Board()
 
 	def get_player(self, sign: int) -> iplayer.IPlayer:
@@ -398,7 +399,8 @@ def main():
 				_, random_player.seed = imgui.input_int("Random player seed", random_player.seed)
 			
 			imgui.separator()
-			imgui.text(f"Board state:\n{state.board}")
+			imgui.text(f"Board hash: {int(state.board)}")
+			imgui.text(f"State:\n{state.board}")
 
 			imgui.separator()
 			imgui.text(f"Should capture:\npositive: {state.board.check_should_capture(1)}\nnegative: {state.board.check_should_capture(-1)}")

@@ -5,11 +5,7 @@ from dataclasses import dataclass
 from enum import Enum
 
 def _s(x: int) -> int:
-	if x > 0:
-		return 1
-	elif x < 0:
-		return -1
-	return 0
+	return int(np.sign(x))
 
 @dataclass
 class _c:
@@ -96,6 +92,18 @@ class Board():
 	def __enemy(self, pos1: _c, pos2: _c) -> bool:
 		return _s(self[pos1]) == -_s(self[pos2])
 	
+	@staticmethod
+	def __faster_iteration_end(pos: _c, i: int) -> _c:
+		return Board.__faster_iteration_start(pos, i + 1)
+	
+	@staticmethod
+	def __faster_iteration_start(pos: _c, i: int) -> _c:
+		if i % 3 == 0:
+			pos.y += 1
+			return _c(pos.y % 2, pos.y)
+		else:
+			return _c(pos.x + 2, pos.y)
+	
 	def __get_simple_directions(self, sign: int) -> list[_c]:
 		if sign > 0:
 			return self.__directions[:2]
@@ -110,30 +118,27 @@ class Board():
 		for sign in [-1, 1]:
 			simple_directions = self.__get_simple_directions(sign)
 
-			for y in range(6):
+			pos = _c(0, -1)
+			for i in range(18):
+				pos = self.__faster_iteration_start(pos, i)
+				piece = self[pos]
+				if _s(piece) != sign:
+					continue
+				t = abs(piece)
+
+				for direction in (simple_directions if t == 1 else self.__directions):
+					enemy_pos = pos + direction
+					empty_pos = enemy_pos + direction
+					if not (
+						self.__invalid(empty_pos) or \
+						not self.__empty(empty_pos) or \
+						not self.__enemy(pos, enemy_pos)
+					):
+						should_capture[sign] = True
+						break
+
 				if should_capture[sign]:
 					break
-
-				for x in range(6):
-					pos = _c(x, y)
-					piece = self[pos]
-					if _s(piece) != sign:
-						continue
-					t = abs(piece)
-
-					for direction in (simple_directions if t == 1 else self.__directions):
-						enemy_pos = pos + direction
-						empty_pos = enemy_pos + direction
-						if not (
-							self.__invalid(empty_pos) or \
-							not self.__empty(empty_pos) or \
-							not self.__enemy(pos, enemy_pos)
-						):
-							should_capture[sign] = True
-							break
-
-					if should_capture[sign]:
-						break
 
 	def __compute_correct_move(self, s: _c, e: _c) -> bool:
 		if self.__invalid(s) or self.__empty(s) or self.__invalid(e) or not self.__empty(e):
@@ -211,6 +216,16 @@ class Board():
 		
 		return ret
 	
+	def get_possible_pos(self) -> set[tuple[int, int]]:
+		ret = set()
+		pos = _c(0, 0)
+		for i in range(18):
+			if _s(self[pos]) == self.__turn_sign:
+				ret.add(pos.tuple())
+			pos = self.__faster_iteration_end(pos, i)
+		
+		return ret
+
 	def __invalidate_cache(self) -> None:
 		self.__correct_moves_cache.clear()
 		self.__game_state_cache = None
@@ -338,7 +353,36 @@ class Board():
 				ret += f"|{self[x, y]:2}"
 			ret += "|\n"
 		return ret
+
+	def __int__(self) -> int:
+		arr = [
+			int(self.turn_sign == 1),
+			self.__moves_since_last_capture,
+			self.__should_capture[-1],
+			self.__should_capture[1]
+		]
+		pos = _c(0, 0)
+		for i in range(18):
+			arr.append(int(self[pos]) + 2)
+			pos = self.__faster_iteration_end(pos, i)
+		
+		return int.from_bytes(bytes(arr))
 	
+	@classmethod
+	def from_int(cls, value: int) -> 'Board':
+		arr = value.to_bytes(22, "big")
+		
+		ret = cls()
+		ret.__turn_sign = 1 if arr[0] else -1
+		ret.__moves_since_last_capture = arr[1]
+		ret.__should_capture = {1: bool(arr[3]), -1: bool(arr[2])}
+
+		pos = _c(0, 0)
+		for i in range(18):
+			ret.__board[pos.x, pos.y] = arr[i + 4] - 2
+			pos = cls.__faster_iteration_end(pos, i)
+
+		return ret
 
 	# Debugging methods
 	def get_correct_moves_cache(self) -> dict[tuple[tuple[int, int], tuple[int, int]], bool]:
