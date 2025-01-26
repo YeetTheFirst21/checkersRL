@@ -143,11 +143,13 @@ class UIState:
 		self.worker_thread.start()
 
 		self.board: Board
+		self.number_of_moves: int
 		self.reset_board()
 
 	def reset_board(self) -> None:
 		self.selected_pos = None
 		self.board = Board()
+		self.number_of_moves = 0
 
 	def get_player(self, sign: int) -> iplayer.IPlayer:
 		return self.players[self.player_i[sign]]
@@ -176,6 +178,7 @@ class UIState:
 
 		if self.selected_pos and pos in self.selected_pos[1]:
 			self.board.make_move(self.selected_pos[0], pos)
+			self.number_of_moves += 1
 			self.selected_pos = None
 
 			if self.automatic_computer_step and not self.waiting_user_input:
@@ -209,6 +212,7 @@ class UIState:
 				start, end = self.players[self.player_i[self.board.turn_sign]].decide_move(self.board)
 				
 				self.board.make_move(start, end)
+				self.number_of_moves += 1
 
 				if self.worker_thread_delay:
 					sleep(1e-3 * (exp(self.worker_thread_delay) - 1))
@@ -318,7 +322,7 @@ def main():
 
 		# Board window
 		# https://github.com/ocornut/imgui/issues/6872
-		imgui.begin(f"Board - {turn_name} turn###Board", False, imgui.WINDOW_NO_COLLAPSE)
+		imgui.begin(f"Board - {turn_name} turn | #turns: {state.number_of_moves}###Board", False, imgui.WINDOW_NO_COLLAPSE)
 		imgui.set_window_size(600, 600)
 		imgui.set_window_position(10, 50, imgui.ONCE)
 		draw_board(

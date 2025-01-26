@@ -22,7 +22,7 @@ class dynamicPlayer(iplayer.IPlayer):
 	}
 	"""
 	mem_key_type = tuple[int, int, tuple[int, int], tuple[int, int]]
-	memoryArr: dict[mem_key_type, int] = {}
+	memoryArr: dict[mem_key_type, float] = {}
 	
 	# here is how a game board usually looks like:
 		# 	self.__board: np.ndarray[tuple[int, int], np.dtype[np.int8]] = np.array([
@@ -54,7 +54,7 @@ class dynamicPlayer(iplayer.IPlayer):
 			(
 				math.exp(self.memoryArr.get(
 					(board_int, turn_sign, start, end),
-					0
+					0.
 				)),
 				(start, end)
 			)
@@ -95,13 +95,14 @@ class dynamicPlayer(iplayer.IPlayer):
 		# we will play the game until it ends:
 		for player in player_order():
 			start,end = player.decide_move(board)
-			board.make_move(start,end)
 			movesMade.add((int(board), board.turn_sign, start, end))
-			if board.game_state != 0:
+			board.make_move(start,end)
+			if board.game_state.value != 0:
 				break
 		
-		if board.game_state != -2:
-			delta = _s(board.game_state.value) * bot_sign
+		abs_delta = 20 * 0.9 ** len(movesMade)
+		if board.game_state.value != -2:
+			delta = _s(board.game_state.value) * bot_sign * abs_delta
 			for move in movesMade:
 				if move not in self.memoryArr:
 					self.memoryArr[move] = 0
@@ -110,7 +111,7 @@ class dynamicPlayer(iplayer.IPlayer):
 			for move in movesMade:
 				if move not in self.memoryArr:
 					self.memoryArr[move] = 0
-				self.memoryArr[move] -= 1
+				self.memoryArr[move] -= abs_delta
 		# we will save the memory array to a file:
 		# self.saveTraining("")
 	
