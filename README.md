@@ -30,6 +30,8 @@ self.board = np.array([
 ]).T
 ```
 
+Agent uses `self.board` and `self.turn_sign`.
+
 #### Fixing the autocomplete issue with pyimgui
 The following extension could be used to *Create Cython TypeStub for Python* from the `.pyx` files of the library:
 

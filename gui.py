@@ -116,6 +116,7 @@ class UIState:
 			2: ImageTexture("./icons/positive_king.png"),
 		}
 		self.popup_content: str = ""
+		self.training_steps = 50
 
 		self.automatic_computer_step: bool = True
 
@@ -128,7 +129,7 @@ class UIState:
 		self.players: list[iplayer.IPlayer] = [
 			iplayer.UserInput(),
 			iplayer.RandomPlayer(0),
-			dp.dynamicPlayer(startFresh=True)
+			dp.dynamicPlayer()
 		]
 
 		self.worker_thread_event = threading.Event()
@@ -338,6 +339,16 @@ def main():
 			_, state.show_settings = imgui.begin("Properties", True, imgui.WINDOW_NO_COLLAPSE)
 			imgui.set_window_size(500, 600)
 			imgui.set_window_position(510, 50, imgui.APPEARING)
+
+			_, state.training_steps = imgui.input_int(
+				"Training steps", state.training_steps)
+			
+			if imgui.button("Do training step"):
+				for i in range(state.training_steps):
+					state.players[2].do_training_step(state.players[2], 1)
+					state.players[2].do_training_step(state.players[2], -1)
+				
+				state.players[2].saveTraining("")
 
 			if imgui.button("Reset board"):
 				state.reset_board()

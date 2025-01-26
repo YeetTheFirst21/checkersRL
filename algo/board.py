@@ -357,7 +357,6 @@ class Board():
 	def __int__(self) -> int:
 		arr = [
 			int(self.turn_sign == 1),
-			self.__moves_since_last_capture,
 			self.__should_capture[-1],
 			self.__should_capture[1]
 		]
@@ -366,20 +365,19 @@ class Board():
 			arr.append(int(self[pos]) + 2)
 			pos = self.__faster_iteration_end(pos, i)
 		
-		return int.from_bytes(bytes(arr))
+		return int.from_bytes(bytes(arr), byteorder="big")
 	
 	@classmethod
 	def from_int(cls, value: int) -> 'Board':
-		arr = value.to_bytes(22, "big")
+		arr = value.to_bytes(21, "big")
 		
 		ret = cls()
 		ret.__turn_sign = 1 if arr[0] else -1
-		ret.__moves_since_last_capture = arr[1]
-		ret.__should_capture = {1: bool(arr[3]), -1: bool(arr[2])}
+		ret.__should_capture = {1: bool(arr[2]), -1: bool(arr[1])}
 
 		pos = _c(0, 0)
 		for i in range(18):
-			ret.__board[pos.x, pos.y] = arr[i + 4] - 2
+			ret.__board[pos.x, pos.y] = arr[i + 3] - 2
 			pos = cls.__faster_iteration_end(pos, i)
 
 		return ret
