@@ -59,7 +59,6 @@ class dynamicPlayer(iplayer.IPlayer):
 		for start in possible_starts:
 			possible_ends = board.get_correct_moves(start)
 			if not possible_ends:
-				possible_starts.remove(start)
 				continue
 			for end in possible_ends:# appending start,end and the value of the move to the possible values array:
 				if (board,start,end) in self.memoryArr:
