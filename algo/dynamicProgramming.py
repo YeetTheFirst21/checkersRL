@@ -125,7 +125,7 @@ class dynamicPlayer(iplayer.IPlayer):
 		# we will play the game until it ends:
 		while True:
 			# we will get the move from the enemy:
-			start,end = enemy.decide_move(board)
+			start,end = enemy.decide_move(board,-1)
 			# we will make the move:
 			board.make_move(start,end)
 			# we will check if the game is over:

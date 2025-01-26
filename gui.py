@@ -14,8 +14,6 @@ from time import sleep
 import json
 from collections.abc import Callable
 from dataclasses import dataclass
-import threading
-from math import exp
 
 import algo.board
 from algo.board import Board
@@ -115,7 +113,6 @@ class UIState:
 			1: ImageTexture("./icons/positive_simple.png"),
 			2: ImageTexture("./icons/positive_king.png"),
 		}
-		self.popup_content: str = ""
 
 		self.automatic_computer_step: bool = True
 
@@ -128,24 +125,12 @@ class UIState:
 		self.players: list[iplayer.IPlayer] = [
 			iplayer.UserInput(),
 			iplayer.RandomPlayer(0),
-			dp.dynamicPlayer(startFresh=True)
+			dp.dynamicPlayer(startFresh=False)
 		]
-
-		self.worker_thread_event = threading.Event()
-		self.worker_thread_is_running = True
-		self.worker_thread_is_working = False
-		self.worker_thread_delay = .7
-		self.worker_thread = threading.Thread(
-			target=self.worker_thread_function,
-			daemon=True
-		)
-		self.worker_thread.start()
-
 		self.board: Board
 		self.reset_board()
 
 	def reset_board(self) -> None:
-		self.selected_pos = None
 		self.board = Board()
 
 	def get_player(self, sign: int) -> iplayer.IPlayer:
@@ -166,10 +151,7 @@ class UIState:
 			not isinstance(self.get_player(self.board.turn_sign), iplayer.UserInput)
 
 	# Handlers
-	def on_pressed_tile(self, pos: tuple[int, int]) -> Optional[str]:
-		if self.worker_thread_event.is_set():
-			return "Computer is currently thinking..."
-
+	def on_pressed_tile(self, pos: tuple[int, int]) -> None:
 		if not self.waiting_user_input:
 			return
 
@@ -178,7 +160,7 @@ class UIState:
 			self.selected_pos = None
 
 			if self.automatic_computer_step and not self.waiting_user_input:
-				self.worker_thread_event.set()
+				self.on_computer_step()
 
 			return
 
@@ -193,33 +175,15 @@ class UIState:
 			pos,
 			self.board.get_correct_moves(pos)
 		)
-
-	def worker_thread_function(self) -> None:
-		while self.worker_thread_event.wait():
-			self.worker_thread_event.clear()
-
-			if not self.worker_thread_is_running:
-				return
-
-			self.selected_pos = None
-
-			self.worker_thread_is_working = True
-			while self.worker_thread_is_working and self.can_do_computer_step:
-				start, end = self.players[self.player_i[self.board.turn_sign]].decide_move(self.board)
-				
-				self.board.make_move(start, end)
-
-				if self.worker_thread_delay:
-					sleep(1e-3 * (exp(self.worker_thread_delay) - 1))
-			
-			self.worker_thread_is_working = False
 	
-	def __del__(self) -> None:
-		self.worker_thread_is_running = False
-		self.worker_thread_pause_requested = True
-		self.worker_thread_event.set()
-		self.worker_thread.join()
-		
+	def on_computer_step(self) -> None:
+		self.selected_pos = None
+
+		while self.can_do_computer_step:
+			start, end = self.players[self.player_i[self.board.turn_sign]].decide_move(
+				self.board, self.board.turn_sign)
+			
+			self.board.make_move(start, end)
 
 def draw_board(state: UIState, pos: tuple[float, float], available_size: tuple[float, float], gap_portion: float = 0.07) -> None:
 	used_size = min(available_size)
@@ -274,10 +238,7 @@ def draw_board(state: UIState, pos: tuple[float, float], available_size: tuple[f
 
 			if imgui.is_item_hovered():
 				if imgui.is_mouse_clicked():
-					res = state.on_pressed_tile(pos)
-					if res:
-						state.popup_content = res
-						imgui.open_popup("Error!")
+					state.on_pressed_tile(pos)
 
 				with imgui.begin_tooltip():
 					imgui.text(f"pos: {pos}")
@@ -289,12 +250,6 @@ def draw_board(state: UIState, pos: tuple[float, float], available_size: tuple[f
 
 		y_c += size + gap
 		x_c = x_s
-	
-	if imgui.begin_popup_modal("Error!").opened:
-		imgui.text(state.popup_content)
-		if imgui.button("OK"):
-			imgui.close_current_popup()
-		imgui.end_popup()
 
 
 def main():
@@ -318,7 +273,7 @@ def main():
 		# Board window
 		# https://github.com/ocornut/imgui/issues/6872
 		imgui.begin(f"Board - {turn_name} turn###Board", False, imgui.WINDOW_NO_COLLAPSE)
-		imgui.set_window_size(600, 600)
+		imgui.set_window_size(500, 500)
 		imgui.set_window_position(10, 50, imgui.ONCE)
 		draw_board(
 			state,
@@ -336,37 +291,28 @@ def main():
 		# Settings window
 		if state.show_settings:
 			_, state.show_settings = imgui.begin("Properties", True, imgui.WINDOW_NO_COLLAPSE)
-			imgui.set_window_size(500, 600)
+			imgui.set_window_size(400, 500)
 			imgui.set_window_position(510, 50, imgui.APPEARING)
 
 			if imgui.button("Reset board"):
 				state.reset_board()
+
+			if imgui.button("Teach dynamic player"):
+				dP : dp.dynamicPlayer = state.players[2]
+				dP.do_training_step(state.players[1])
 
 			_, state.board.enable_update_should_capture = imgui.checkbox(
 				"Enable should capture rule", state.board.enable_update_should_capture)
 
 			imgui.separator()
 			imgui.text(f"{state.board.game_state}, turn: {turn_name}")
-			imgui.text(f"Turns without captures: {state.board.moves_since_last_capture}")
 
-			imgui.separator()
-			imgui.text(f"Computer working: {state.worker_thread_is_working}")
-
-			with disabled_block(state.worker_thread_is_working or not state.can_do_computer_step):
+			with disabled_block(not state.can_do_computer_step):
 				if imgui.button("Computer step"):
-					state.worker_thread_event.set()
-			
-			with disabled_block(not state.worker_thread_is_working):
-				imgui.same_line()
-				if imgui.button("Stop computer"):
-					state.worker_thread_is_working = False
+					state.on_computer_step()
 
 			_, state.automatic_computer_step = imgui.checkbox(
 				"Automatic computer step", state.automatic_computer_step)
-
-			imgui.set_next_item_width(imgui.get_content_region_available_width() * 0.4)
-			_, state.worker_thread_delay = imgui.slider_float(
-				"Computer step delay", state.worker_thread_delay, 0, 5)
 
 			# Players selection
 			imgui.separator()
@@ -398,8 +344,7 @@ def main():
 				_, random_player.seed = imgui.input_int("Random player seed", random_player.seed)
 			
 			imgui.separator()
-			imgui.text(f"Board hash: {int(state.board)}")
-			imgui.text(f"State:\n{state.board}")
+			imgui.text(f"Board state:\n{state.board}")
 
 			imgui.separator()
 			imgui.text(f"Should capture:\npositive: {state.board.check_should_capture(1)}\nnegative: {state.board.check_should_capture(-1)}")
