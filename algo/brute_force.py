@@ -1,22 +1,32 @@
 from board import Board, GameState
+import copy
 
-arr = set()
-q = [int(Board())]
+arr: set[bytes] = set()
+b = Board()
+q: list[tuple[bytes, Board]] = [(bytes(b), b)]
+prev_max = 0
 
 while q:
-	cur = q.pop()
-	cur_b = Board.from_num_repr(cur)
-	if cur in arr:
+	cur_bytes, cur = q.pop()
+	arr.add(cur_bytes)
+
+	if cur.game_state != GameState.NOT_OVER:
 		continue
-	arr.add(int(cur))
-	for start in cur_b.get_possible_pos():
-		for end in cur_b.get_correct_moves(start):
-			new_board = Board.from_num_repr(cur)
+
+	for start in cur.get_possible_pos():
+		for end in cur.get_correct_moves(start):
+			new_board = copy.deepcopy(cur)
 			new_board.make_move(start, end)
-			if new_board.game_state == GameState.NOT_OVER:
-				q.append(int(new_board))
+			new_board_bytes = bytes(new_board)
+
+			if new_board_bytes in arr:
+				continue
+
+			q.append((new_board_bytes, new_board))
 	
-	if len(arr) % 1e3 == 0:
-		print(len(arr))
+	l = len(arr)
+	if l % 1e3 == 0 and l > prev_max:
+		print(l)
+		prev_max = l
 
 print(len(arr))
