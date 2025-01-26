@@ -205,8 +205,7 @@ class UIState:
 
 			self.worker_thread_is_working = True
 			while self.worker_thread_is_working and self.can_do_computer_step:
-				start, end = self.players[self.player_i[self.board.turn_sign]].decide_move(
-					self.board, self.board.turn_sign)
+				start, end = self.players[self.player_i[self.board.turn_sign]].decide_move(self.board)
 				
 				self.board.make_move(start, end)
 
