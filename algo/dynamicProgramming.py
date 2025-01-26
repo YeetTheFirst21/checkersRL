@@ -37,7 +37,7 @@ class dynamicPlayer(iplayer.IPlayer):
 							self.memoryArr[(board,pos,end)] = 100
 		else:
 			# we will load the memory array from the file.
-			self.loadTraining()
+			self.loadTraining("")
 		
 
 
@@ -87,7 +87,7 @@ class dynamicPlayer(iplayer.IPlayer):
 			# Pick a random move
 			move = random.choices(list(probabilities.keys()), list(probabilities.values()))[0]
 			return move
-		else:
+		elif len(maxValueLocations) == 1:
 			# If there is only one move, return it
 			return list(maxValueLocations)[0]
 
@@ -105,21 +105,32 @@ class dynamicPlayer(iplayer.IPlayer):
 		movesMade = {}
 		# this will hold the board,start,end and with it at the end we will update the memory array by incrementing all the moves that led to a win by 1 and decrementing all the moves that led to a loss by 1.
 		
+		def awardOrPunish(movesMade: dict, game_state: int):
+			if game_state == 1:#positive won so our bot gets awarded:
+				for move in movesMade:
+					if movesMade[move]:
+						if self.memoryArr[move.keys()] == None:
+							self.memoryArr[move.keys()] = 101
+						else:
+							self.memoryArr[move.keys()] += 1
+			elif game_state == -1:#negative won so our bot gets punished:
+				for move in movesMade:
+					if movesMade[move]:
+						if self.memoryArr[move.keys()] == None:
+							self.memoryArr[move.keys()] = 99
+						else:
+							self.memoryArr[move.keys()] -= 1
+
+		
 		# we will play the game until it ends:
 		while True:
 			# we will get the move from the enemy:
-			start,end = enemy.decide_move(board,-1)
+			start,end = enemy.decide_move(board)
 			# we will make the move:
 			board.make_move(start,end)
 			# we will check if the game is over:
 			if board.game_state != None:
-				if board.game_state == 1:
-					# we will update the memory array by incrementing all the moves that led to a win by 1 and decrementing all the moves that led to a loss by 1.
-					for move in movesMade:
-						if movesMade[move]:
-							self.memoryArr[move.keys()] += 1
-						else:
-							self.memoryArr[move.keys()] -= 1
+				awardOrPunish(movesMade, board.game_state)
 				break
 			# we will get the move from the agent:
 			start,end = self.decide_move(board,1)
@@ -129,16 +140,11 @@ class dynamicPlayer(iplayer.IPlayer):
 			movesMade[board,start,end] = 1
 			# we will check if the game is over:
 			if board.game_state != None:
-				if board.game_state == 1:
-					# we will update the memory array by incrementing all the moves that led to a win by 1 and decrementing all the moves that led to a loss by 1.
-					for move in movesMade:
-						if movesMade[move]:
-							self.memoryArr[move.keys()] += 1
-						else:
-							self.memoryArr[move.keys()] -= 1
+				awardOrPunish(movesMade, board.game_state)
 				break
+		
 		# we will save the memory array to a file:
-		self.saveTraining()
+		self.saveTraining("")
 		
 			
 
