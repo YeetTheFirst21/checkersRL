@@ -1,8 +1,9 @@
 import numpy as np
 
-from typing import Optional
+from typing import Optional, Iterator
 from dataclasses import dataclass
 from enum import Enum
+import itertools
 
 def _s(x: int) -> int:
 	return int(np.sign(x))
@@ -184,7 +185,7 @@ class Board():
 			return False
 		
 		direction = delta.s()
-		
+
 		# Simple piece
 		if t == 1:
 			direction_index = self.__directions.index(direction)
@@ -242,19 +243,17 @@ class Board():
 	def is_move_correct(self, start: tuple[int, int], end: tuple[int, int]) -> bool:
 		return self.__is_move_correct(_c(*start), _c(*end))
 
-	def get_correct_moves(self, start: tuple[int, int]) -> set[tuple[int, int]]:
+	def get_correct_moves(self, start: tuple[int, int]) -> Iterator[tuple[int, int]]:
 		s = _c(*start)
 		if self.__invalid(s) or self.__empty(s):
-			return set()
+			return
 		
 		piece = self[s]
 		t = abs(piece)
 		sign = _s(piece)
 
 		if t != 1 and t != 2:
-			return set()
-		
-		ret = set()
+			return
 		
 		# Simple piece
 		if t == 1:
@@ -268,13 +267,13 @@ class Board():
 					next_next_pos = next_pos + direction
 					if not self.__enemy(s, next_pos) or self.__invalid(next_next_pos) or not self.__empty(next_next_pos):
 						continue
-					ret.add(next_next_pos.tuple())
+					yield next_next_pos.tuple()
 				
 				# Non-capture move
 				elif self.__empty(next_pos):
-					ret.add(next_pos.tuple())
+					yield next_pos.tuple()
 			
-			return ret
+			return
 		
 		# King piece
 		elif t == 2:
@@ -291,7 +290,7 @@ class Board():
 						# We should have already found the enemy if we should capture
 						#  and vise versa
 						if found_enemy == self.check_should_capture(sign):
-							ret.add(cur_pos.tuple())
+							yield cur_pos.tuple()
 					
 					# We are here => cur_pos is not empty
 					elif not self.__enemy(s, cur_pos):
@@ -303,19 +302,21 @@ class Board():
 							break
 						found_enemy = True
 		
-			return ret
+			return
 
 		raise ValueError("Invalid piece on the board!")
 	
-	def get_possible_pos(self) -> set[tuple[int, int]]:
-		ret = set()
+	def __get_possible_pos(self, sign: int) -> Iterator[tuple[int, int]]:
 		pos = _c(0, 0)
 		for i in range(18):
-			if _s(self[pos]) == self.__turn_sign:
-				ret.add(pos.tuple())
+			if _s(self[pos]) == sign:
+				yield pos.tuple()
 			pos = self.__faster_iteration_end(pos, i)
 		
-		return ret
+		return
+
+	def get_possible_pos(self) -> Iterator[tuple[int, int]]:
+		return self.__get_possible_pos(self.__turn_sign)
 
 	def __invalidate_cache(self) -> None:
 		self.__correct_moves_cache.clear()
@@ -372,7 +373,7 @@ class Board():
 		# Change the turn
 		#    If we should and can capture with the same piece, we should not change the turn
 		if had_to_capture and self.check_should_capture(self.__turn_sign) and \
-				self.get_correct_moves(end):
+				next(self.get_correct_moves(end), None):
 			return
 		
 		# 	Otherwise, change the turn
@@ -400,24 +401,19 @@ class Board():
 			return GameState.DRAW
 
 		turn_sign = self.__turn_sign
-		turns_pieces: list[tuple[int, int]] = []
-		opp_turn_has_pieces = False
-		for x in range(6):
-			for y in range(6):
-				sign = _s(self.__board[x, y])
-				if sign == turn_sign:
-					turns_pieces.append((x, y))
-				elif sign != 0:
-					opp_turn_has_pieces = True
+		opp_turn_has_pieces = next(self.__get_possible_pos(-turn_sign), None)
+		turns_pieces = self.__get_possible_pos(turn_sign)
+		first_piece = next(turns_pieces, None)
 		
-		if not turns_pieces:
+		if not first_piece:
 			return GameState(-turn_sign)
 		elif not opp_turn_has_pieces:
 			return GameState(turn_sign)
 		
-		for pos in turns_pieces:
-			if self.get_correct_moves(pos):
+		for pos in itertools.chain([first_piece], turns_pieces):
+			if next(self.get_correct_moves(pos), None):
 				return GameState.NOT_OVER
+		
 		return GameState(-turn_sign)
 
 	def __getitem__(self, pos: _c | tuple[int, int]) -> int:

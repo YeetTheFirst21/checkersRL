@@ -29,10 +29,11 @@ class RandomPlayer(IPlayer):
 		random.shuffle(possible_starts)
 
 		for start in possible_starts:
-			possible_ends = board.get_correct_moves(start)
-			if not possible_ends:
+			possible_ends_gen = board.get_correct_moves(start)
+			first_end = next(possible_ends_gen, None)
+			if not first_end:
 				continue
-			end = random.choice(list(possible_ends))
+			end = random.choice([first_end] + list(possible_ends_gen))
 			return start, end
 		
 		raise ValueError("Tried to ask for a move when there are no possible moves")

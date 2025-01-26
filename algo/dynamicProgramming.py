@@ -50,7 +50,7 @@ class dynamicPlayer(iplayer.IPlayer):
 	def decide_move(self, board: iplayer.Board) -> tuple[tuple[int, int], tuple[int, int]]:
 		board_int = int(board)
 		turn_sign = board.turn_sign
-		possible_moves: dict[tuple[int, int], tuple[int, int]] = [
+		possible_moves: list[tuple[float, tuple[tuple[int, int], tuple[int, int]]]] = [
 			(
 				math.exp(self.memoryArr.get(
 					(board_int, turn_sign, start, end),

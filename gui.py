@@ -189,13 +189,13 @@ class UIState:
 		if not self.board.is_valid_pos(pos) or not self.board[pos] or \
 				(self.selected_pos and pos == self.selected_pos[0]) or \
 				algo.board._s(self.board[pos]) != self.board.turn_sign or \
-				not self.board.get_correct_moves(pos):
+				not next(self.board.get_correct_moves(pos), None):
 			self.selected_pos = None
 			return
 
 		self.selected_pos = (
 			pos,
-			self.board.get_correct_moves(pos)
+			set(self.board.get_correct_moves(pos))
 		)
 
 	def worker_thread_function(self) -> None:
@@ -270,7 +270,7 @@ def draw_board(state: UIState, pos: tuple[float, float], available_size: tuple[f
 			if piece == 0:
 				imgui.image_button(state.textures[0].enabled_texture_id, size - 2, size)
 			else:
-				if sign == state.board.turn_sign and state.waiting_user_input and state.board.get_correct_moves(pos):
+				if sign == state.board.turn_sign and state.waiting_user_input and next(state.board.get_correct_moves(pos), None):
 					imgui.image_button(state.textures[piece].enabled_texture_id, size - 2, size)
 				else:
 					imgui.image_button(state.textures[piece].disabled_texture_id, size - 2, size)
