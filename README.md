@@ -53,7 +53,7 @@ https://marketplace.visualstudio.com/items?itemName=ktnrg45.vscode-cython
 * `Board.make_move(start, end)` - function that makes a move and updates the `should_capture` property. WARNING: the move should be correct, otherwise the board will be corrupted
 * `Board[(x, y)]` - magic that returns the value of the board at the position `(x, y)`
 * `int(Board)` - magic method that returns the integer representation of the board. It could be used to store compressed board class representation or for hashing
-* `Board.from_int(int_board)` - static method that creates a board from an integer representation
+* `Board.from_num_repr(int | bytes)` - static method that creates a board from an number representation
 
 ## Documenting different approaches
 ### Brute force

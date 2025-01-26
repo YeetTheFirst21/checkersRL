@@ -451,7 +451,7 @@ class Board():
 			ret += "|\n"
 		return ret
 
-	def __int__(self) -> int:
+	def __bare_byte_repr(self) -> bytes:
 		arr = [
 			int(self.turn_sign == 1),
 			self.__should_capture[-1],
@@ -462,13 +462,34 @@ class Board():
 			arr.append(int(self[pos]) + 2)
 			pos = self.__faster_iteration_end(pos, i)
 		
-		return int.from_bytes(bytes(arr), byteorder="big")
+		return bytes(arr)
+
+	def __int__(self) -> int:
+		return int.from_bytes(
+			self.__bare_byte_repr(),
+			byteorder="big"
+		)
+
+	def __bytes__(self) -> bytes:
+		return bytes([
+			self.__enable_update_should_capture,
+			self.__moves_since_last_capture,
+		]) + self.__bare_byte_repr()
 	
 	@classmethod
-	def from_int(cls, value: int) -> 'Board':
-		arr = value.to_bytes(21, "big")
-		
+	def from_num_repr(cls, value: int | bytes) -> 'Board':
 		ret = cls()
+
+		# Int is reserved for the bare byte representation
+		if isinstance(value, int):
+			arr = value.to_bytes(21, "big")
+
+		# Bytes is reserved for the full byte representation
+		elif isinstance(value, bytes):
+			ret.__enable_update_should_capture = bool(value[0])
+			ret.__moves_since_last_capture = value[1]
+			arr = value[2:]
+		
 		ret.__turn_sign = 1 if arr[0] else -1
 		ret.__should_capture = {1: bool(arr[2]), -1: bool(arr[1])}
 
