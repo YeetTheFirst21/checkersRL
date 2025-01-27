@@ -128,7 +128,7 @@ class UIState:
 		self.player_i: dict[int, int] = { 1: 0, -1: 0 }
 		self.players: list[iplayer.IPlayer] = [
 			iplayer.UserInput(),
-			iplayer.RandomPlayer(0),
+			iplayer.RandomPlayer(433),
 			dp.dynamicPlayer()
 		]
 
@@ -150,6 +150,7 @@ class UIState:
 		self.selected_pos = None
 		self.board = Board()
 		self.number_of_moves = 0
+		self.players[2].seed = 0
 
 	def get_player(self, sign: int) -> iplayer.IPlayer:
 		return self.players[self.player_i[sign]]
@@ -349,8 +350,11 @@ def main():
 			
 			if imgui.button("Do training step"):
 				for i in range(state.training_steps):
-					state.players[2].do_training_step(state.players[2], 1)
-					state.players[2].do_training_step(state.players[2], -1)
+					#state.players[1].seed = i
+					state.players[2].seed = 0
+					state.players[2].do_training_step(state.players[1], 1)
+					state.players[2].seed = 0
+					state.players[2].do_training_step(state.players[1], -1)
 				
 				state.players[2].saveTraining("")
 
@@ -381,7 +385,7 @@ def main():
 
 			imgui.set_next_item_width(imgui.get_content_region_available_width() * 0.4)
 			_, state.worker_thread_delay = imgui.slider_float(
-				"Computer step delay", state.worker_thread_delay, 0, 5)
+				"Computer step delay", state.worker_thread_delay, 0, 10)
 
 			# Players selection
 			imgui.separator()

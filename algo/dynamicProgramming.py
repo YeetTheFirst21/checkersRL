@@ -34,8 +34,9 @@ class dynamicPlayer(iplayer.IPlayer):
 		# 	[0, 1, 0, 1, 0, 1]
 		# ], dtype=np.int8).reshape(self.SIZE, self.SIZE).T
 	
-	def __init__(self,startFresh:bool = False):
+	def __init__(self,startFresh:bool = False, seed:int=0):
 		super().__init__()
+		self.seed = seed
 		if startFresh:
 			# since we are doing a fresh start, we will create a new memory array full of all possible states and moves and give them a value of 100.
 			# we get a new Board object to get the possible states and moves.
@@ -45,17 +46,24 @@ class dynamicPlayer(iplayer.IPlayer):
 			# we will load the memory array from the file.
 			self.loadTraining("")
 		
-
+	def __get_exponent(self, board_int: int, turn_sign: int, start: tuple[int, int], end: tuple[int, int]) -> float:
+		key = (board_int, turn_sign, start, end)
+		if key not in self.memoryArr:
+			print("miss")
+			return 1.
+		else:
+			print("hit")
+			try:
+				return math.exp(self.memoryArr[key])
+			except:
+				return 1.
 
 	def decide_move(self, board: iplayer.Board) -> tuple[tuple[int, int], tuple[int, int]]:
 		board_int = int(board)
 		turn_sign = board.turn_sign
 		possible_moves: dict[tuple[int, int], tuple[int, int]] = [
 			(
-				math.exp(self.memoryArr.get(
-					(board_int, turn_sign, start, end),
-					0.
-				)),
+				self.__get_exponent(board_int, turn_sign, start, end),
 				(start, end)
 			)
 			for start in board.get_possible_pos()
@@ -63,7 +71,9 @@ class dynamicPlayer(iplayer.IPlayer):
 		]
 
 		exponents, moves = zip(*possible_moves)
+		random.seed(self.seed)
 		r = random.random() * sum(exponents)
+		self.seed = random.randint(0, 1000000)
 		for i, move in enumerate(moves):
 			r -= exponents[i]
 			if r <= 0:
@@ -100,8 +110,9 @@ class dynamicPlayer(iplayer.IPlayer):
 			if board.game_state.value != 0:
 				break
 		
-		abs_delta = 20 * 0.9 ** len(movesMade)
+		abs_delta = 3 * 0.9 ** len(movesMade)
 		if board.game_state.value != -2:
+			#print(f"state:{board.game_state.value==bot_sign}")
 			delta = _s(board.game_state.value) * bot_sign * abs_delta
 			for move in movesMade:
 				if move not in self.memoryArr:
@@ -111,7 +122,7 @@ class dynamicPlayer(iplayer.IPlayer):
 			for move in movesMade:
 				if move not in self.memoryArr:
 					self.memoryArr[move] = 0
-				self.memoryArr[move] -= abs_delta
+				self.memoryArr[move] -= (abs_delta/2)
 		# we will save the memory array to a file:
 		# self.saveTraining("")
 	
@@ -131,3 +142,4 @@ class dynamicPlayer(iplayer.IPlayer):
 	
 	def __str__(self) -> str:
 		return "Dynamic Learning Agent"
+	
