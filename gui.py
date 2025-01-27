@@ -125,6 +125,9 @@ def main():
 		)
 		imgui.end()
 
+		if state.show_test_window:
+			imgui.show_test_window()
+
 		# Top menu bar
 		with imgui.begin_main_menu_bar():
 			clicked, _ = imgui.menu_item("Properties", "Ctrl+,", False)
@@ -134,6 +137,10 @@ def main():
 			clicked, _ = imgui.menu_item("Tree vis", "Ctrl+v", False)
 			if clicked:
 				tree_vis.show_window = True
+			
+			clicked, _ = imgui.menu_item("Test window", "Ctrl+t", False)
+			if clicked:
+				state.show_test_window = not state.show_test_window
 
 		# Settings window
 		if state.show_settings:

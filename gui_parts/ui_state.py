@@ -11,6 +11,7 @@ import algo.dynamicProgramming as dp
 class UIState:
 	def __init__(self) -> None:
 		self.show_settings: bool = True
+		self.show_test_window: bool = False
 		self.textures: dict[int, ImageTexture] = {
 			-2: ImageTexture("./icons/negative_king.png"),
 			-1: ImageTexture("./icons/negative_simple.png"),
