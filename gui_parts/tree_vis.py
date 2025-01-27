@@ -12,12 +12,14 @@ class TreeVis:
 	def __init__(self, state: UIState) -> None:
 		self.ui_state = state
 		self.parent_tree: Optional[dict[int, set[int]]] = None
+		self.__parent_tree_size = 0
 		self.show_window = False
 
 		self.__me_integer_input = "1461501724784805657539772557023077283449775784707"
 
 		self.parents: list[Board] = [Board()]
 		self.me: Optional[Board] = Board()
+		self.__me_int: Optional[int] = int(self.me)
 		self.children: list[Board] = [Board()]
 
 	def __draw_board(self, board: Board, size: tuple[float, float], mouse_pos: Optional[tuple[float, float]]) -> None:
@@ -51,12 +53,15 @@ class TreeVis:
 	def load_tree(self) -> None:
 		with open(ROOT_DIR / "parent_tree.pickle", "rb") as f:
 			self.parent_tree = pickle.load(f)
-
+		
+		assert self.parent_tree
+		self.__parent_tree_size = len(self.parent_tree)
 		self.select_me(Board())
 
 	def unload_tree(self) -> None:
 		del self.parent_tree
 		self.parent_tree = None
+		self.__parent_tree_size = 0
 	
 	def select_me(self, board: Board) -> None:
 		self.me = board
@@ -65,6 +70,7 @@ class TreeVis:
 			return
 
 		board_int = int(board)
+		self.__me_int = board_int
 
 		if board_int in self.parent_tree:
 			self.parents = [
@@ -82,6 +88,7 @@ class TreeVis:
 			return
 		
 		with imgui.begin("Tree visualization", True) as (_, is_open):
+			imgui.set_window_size(800, 600)
 			self.show_window = is_open
 
 			if imgui.button("Load tree" if self.parent_tree is None else "Unload tree"):
@@ -97,6 +104,8 @@ class TreeVis:
 			imgui.same_line()
 			_, self.__me_integer_input = imgui.input_text("Me", self.__me_integer_input)
 
+			imgui.text(f"Number of states saved: {self.__parent_tree_size}")
+			imgui.text(f"Current state: {self.__me_int}")
 			
 			w, h = imgui.get_content_region_available()
 			max_board_height = h * .25
