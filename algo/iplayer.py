@@ -1,7 +1,7 @@
-import numpy as np
-
 import random
 from abc import ABC, abstractmethod
+from typing import Callable
+from os import PathLike
 
 from .board import Board, _s
 
@@ -10,33 +10,72 @@ class IPlayer(ABC):
 	def decide_move(self, board: Board) -> tuple[tuple[int, int], tuple[int, int]]:
 		pass
 
+	def do_training_round(self, enemy: 'IPlayer', sign: int) -> bool:
+		"""Returns true if the model won the game"""
+		return False
+
 class UserInput(IPlayer):
 	def decide_move(self, board: Board) -> tuple[tuple[int, int], tuple[int, int]]:
 		raise NotImplementedError("Should be handled by UI side")
+	
+	def do_training_round(self, enemy: IPlayer, sign: int) -> bool:
+		raise NotImplementedError("Can't train user")
 
 	def __str__(self) -> str:
 		return "User input"
 	
-class RandomPlayer(IPlayer):
+
+class IRandomPlayer(IPlayer):
+	def __save_random_state(self, func: Callable) -> Callable:
+		def wrapper(*args, **kwargs):
+			self.random.seed(self.seed)
+			res = func(*args, **kwargs)
+			self.seed = self.random.randint(0, 1<<16 - 1)
+			return res
+		return wrapper
+
 	def __init__(self, seed: int) -> None:
 		super().__init__()
+
+		self.decide_move = self.__save_random_state(self.decide_move)
+
 		self.seed = seed
+		self.random = random.Random(seed)
+	
+class RandomPlayer(IRandomPlayer):
+	def __init__(self, seed: int = 0) -> None:
+		super().__init__(seed)
 
 	def decide_move(self, board: Board) -> tuple[tuple[int, int], tuple[int, int]]:
-		random.seed(self.seed)
-
 		possible_starts = list(board.get_possible_pos())
-		random.shuffle(possible_starts)
+		self.random.shuffle(possible_starts)
 
 		for start in possible_starts:
 			possible_ends_gen = board.get_correct_moves(start)
 			first_end = next(possible_ends_gen, None)
 			if not first_end:
 				continue
-			end = random.choice([first_end] + list(possible_ends_gen))
+			end = self.random.choice([first_end] + list(possible_ends_gen))
 			return start, end
 		
 		raise ValueError("Tried to ask for a move when there are no possible moves")
+	
+	def do_training_round(self, enemy: IPlayer, sign: int) -> bool:
+		raise NotImplementedError("Can't train random player")
 
 	def __str__(self) -> str:
 		return "Random player"
+	
+class ITrainablePlayer(IPlayer):
+	@abstractmethod
+	def do_training_round(self, enemy: 'IPlayer', sign: int) -> bool:
+		"""Returns true if the model won the game"""
+		return False
+	
+	@abstractmethod
+	def save_model(self, path: PathLike | str) -> None:
+		pass
+
+	@abstractmethod
+	def load_model(self, path: PathLike | str) -> None:
+		pass

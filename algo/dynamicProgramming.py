@@ -1,13 +1,12 @@
 from . import iplayer
 
-import random
 import math
 from .board import Board, _s
 import numpy as np
 
 import pickle
 
-class dynamicPlayer(iplayer.IPlayer):
+class dynamicPlayer(iplayer.IRandomPlayer, iplayer.ITrainablePlayer):
 	
 	# here is a dictionary we have, the first keys are the states of the game and the second keys are the moves that can be made from that state and then finally the value of the moves that can be max 100.
 	"""
@@ -34,8 +33,8 @@ class dynamicPlayer(iplayer.IPlayer):
 		# 	[0, 1, 0, 1, 0, 1]
 		# ], dtype=np.int8).reshape(self.SIZE, self.SIZE).T
 	
-	def __init__(self,startFresh:bool = False):
-		super().__init__()
+	def __init__(self, startFresh:bool = False, seed:int = 0) -> None:
+		iplayer.IRandomPlayer.__init__(self, seed)
 		if startFresh:
 			# since we are doing a fresh start, we will create a new memory array full of all possible states and moves and give them a value of 100.
 			# we get a new Board object to get the possible states and moves.
@@ -43,7 +42,7 @@ class dynamicPlayer(iplayer.IPlayer):
 			board = Board()
 		else:
 			# we will load the memory array from the file.
-			self.loadTraining("")
+			self.load_model("")
 		
 
 
@@ -63,7 +62,7 @@ class dynamicPlayer(iplayer.IPlayer):
 		]
 
 		exponents, moves = zip(*possible_moves)
-		r = random.random() * sum(exponents)
+		r = self.random.random() * sum(exponents)
 		for i, move in enumerate(moves):
 			r -= exponents[i]
 			if r <= 0:
@@ -71,7 +70,7 @@ class dynamicPlayer(iplayer.IPlayer):
 		
 		raise ValueError("Tried to ask for a move when there are no possible moves")
 
-	def do_training_step(self, enemy: iplayer.IPlayer, bot_sign: int):
+	def do_training_round(self, enemy: iplayer.IPlayer, bot_sign: int):
 		# this is pretty much the same as decide_move but we will also update the memory array if we lose or win.
 		# we will get the best move from the memory array and then play it.
 		
@@ -115,12 +114,12 @@ class dynamicPlayer(iplayer.IPlayer):
 		# we will save the memory array to a file:
 		# self.saveTraining("")
 	
-	def saveTraining(self, path: str) -> None:
+	def save_model(self, path: str) -> None:
 		path = path or "dynamic_learning_agent"
 		with open(path+".dynamicProgrammingSave", "wb") as f:
 			pickle.dump(self.memoryArr, f)
 			
-	def loadTraining(self, path: str) -> bool:
+	def load_model(self, path: str) -> bool:
 		path = path or "dynamic_learning_agent"
 		try:
 			with open(path+".dynamicProgrammingSave", "rb") as f:

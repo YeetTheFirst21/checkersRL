@@ -15,6 +15,7 @@ import algo.iplayer as iplayer
 from gui_parts.utils import disabled_block
 from gui_parts.ui_state import UIState
 from gui_parts.tree_vis import TreeVis
+from gui_parts.models_menu import ModelsMenu
 		
 
 def draw_board(state: UIState, pos: tuple[float, float], available_size: tuple[float, float], gap_portion: float = 0.07) -> None:
@@ -103,6 +104,7 @@ def main():
 	imgui.get_io().font_global_scale = 1.5
 
 	tree_vis = TreeVis(state)
+	models_menu = ModelsMenu(state)
 
 	# MAIN LOOP
 	while not glfw.window_should_close(window):
@@ -134,6 +136,10 @@ def main():
 			if clicked:
 				state.show_settings = True
 
+			clicked, _ = imgui.menu_item("Models", "Ctrl+m", False)
+			if clicked:
+				models_menu.show_window = True
+
 			clicked, _ = imgui.menu_item("Tree vis", "Ctrl+v", False)
 			if clicked:
 				tree_vis.show_window = True
@@ -147,19 +153,6 @@ def main():
 			_, state.show_settings = imgui.begin("Properties", True, imgui.WINDOW_NO_COLLAPSE)
 			imgui.set_window_size(500, 600)
 			imgui.set_window_position(510, 50, imgui.APPEARING)
-
-			_, state.training_steps = imgui.input_int(
-				"Training steps", state.training_steps)
-			
-			if imgui.button("Do training step"):
-				for i in range(state.training_steps):
-					state.players[2].do_training_step(state.players[2], 1)
-					state.players[2].do_training_step(state.players[2], -1)
-				
-				state.players[2].saveTraining("")
-
-			if imgui.button("Reset board"):
-				state.reset_board()
 
 			_, state.board.enable_update_should_capture = imgui.checkbox(
 				"Enable should capture rule", state.board.enable_update_should_capture)
@@ -179,6 +172,15 @@ def main():
 				imgui.same_line()
 				if imgui.button("Stop computer"):
 					state.worker_thread_is_working = False
+			
+
+			if imgui.button("Reset board"):
+				state.reset_board()
+
+			imgui.same_line()
+			if imgui.button("Reset board and seeds"):
+				state.reset_board()
+				models_menu.reset_seeds()
 
 			_, state.automatic_computer_step = imgui.checkbox(
 				"Automatic computer step", state.automatic_computer_step)
@@ -190,7 +192,10 @@ def main():
 			# Players selection
 			imgui.separator()
 			with imgui.begin_table("Players selection", 2):
-				player_names = [str(player) for player in state.players]
+				player_names = [
+					state.get_player_list_name(i)
+					for i in range(len(state.players))
+				]
 
 				imgui.table_next_row()
 				imgui.table_next_column()
@@ -209,12 +214,6 @@ def main():
 					)
 					if changed:
 						state.player_i[i] = new_val
-
-			if isinstance(state.get_player(1), iplayer.RandomPlayer) or \
-					isinstance(state.get_player(-1), iplayer.RandomPlayer):
-				random_player: iplayer.RandomPlayer = state.players[1] # type: ignore
-				imgui.set_next_item_width(imgui.get_content_region_available_width() * 0.4)
-				_, random_player.seed = imgui.input_int("Random player seed", random_player.seed)
 			
 			imgui.separator()
 			imgui.text(f"Board hash: {int(state.board)}")
@@ -238,6 +237,7 @@ def main():
 			imgui.end()
 
 		tree_vis.draw()
+		models_menu.draw()
 
 		gl.glClearColor(0.0, 0.0, 0.0, 1)
 		gl.glClear(gl.GL_COLOR_BUFFER_BIT)
@@ -253,7 +253,7 @@ def main():
 
 
 def __impl_glfw_init():
-	width, height = 1280, 720
+	width, height = 1680, 720
 	window_name = "CHECKERS LETS GOO"
 
 	if not glfw.init():

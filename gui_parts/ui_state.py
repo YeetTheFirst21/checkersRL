@@ -20,7 +20,6 @@ class UIState:
 			2: ImageTexture("./icons/positive_king.png"),
 		}
 		self.popup_content: str = ""
-		self.training_steps = 50
 
 		self.automatic_computer_step: bool = True
 
@@ -29,10 +28,10 @@ class UIState:
 			set[tuple[int, int]]
 		]] = None
 
-		self.player_i: dict[int, int] = { 1: 0, -1: 0 }
+		self.player_i: dict[int, int] = { 1: 0, -1: 1 }
 		self.players: list[iplayer.IPlayer] = [
 			iplayer.UserInput(),
-			iplayer.RandomPlayer(0),
+			iplayer.RandomPlayer(),
 			dp.dynamicPlayer()
 		]
 
@@ -57,6 +56,9 @@ class UIState:
 
 	def get_player(self, sign: int) -> iplayer.IPlayer:
 		return self.players[self.player_i[sign]]
+
+	def get_player_list_name(self, index: int) -> str:
+		return f"{index+1}. {self.players[index]}"
 
 	@property
 	def game_is_going(self) -> bool:
@@ -113,7 +115,7 @@ class UIState:
 
 			self.worker_thread_is_working = True
 			while self.worker_thread_is_working and self.can_do_computer_step:
-				start, end = self.players[self.player_i[self.board.turn_sign]].decide_move(self.board)
+				start, end = self.get_player(self.board.turn_sign).decide_move(self.board)
 				
 				self.board.make_move(start, end)
 				self.number_of_moves += 1
