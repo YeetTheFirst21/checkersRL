@@ -14,6 +14,7 @@ import algo.iplayer as iplayer
 
 from gui_parts.utils import disabled_block
 from gui_parts.ui_state import UIState
+from gui_parts.tree_vis import TreeVis
 		
 
 def draw_board(state: UIState, pos: tuple[float, float], available_size: tuple[float, float], gap_portion: float = 0.07) -> None:
@@ -101,6 +102,8 @@ def main():
 	state = UIState()
 	imgui.get_io().font_global_scale = 1.5
 
+	tree_vis = TreeVis(state)
+
 	# MAIN LOOP
 	while not glfw.window_should_close(window):
 		glfw.poll_events()
@@ -127,6 +130,10 @@ def main():
 			clicked, _ = imgui.menu_item("Properties", "Ctrl+,", False)
 			if clicked:
 				state.show_settings = True
+
+			clicked, _ = imgui.menu_item("Tree vis", "Ctrl+v", False)
+			if clicked:
+				tree_vis.show_window = True
 
 		# Settings window
 		if state.show_settings:
@@ -222,6 +229,8 @@ def main():
 				imgui.get_io().font_global_scale = value
 			
 			imgui.end()
+
+		tree_vis.draw()
 
 		gl.glClearColor(0.0, 0.0, 0.0, 1)
 		gl.glClear(gl.GL_COLOR_BUFFER_BIT)
