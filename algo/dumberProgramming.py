@@ -7,7 +7,7 @@ import numpy as np
 
 import pickle
 
-class dynamicPlayer(iplayer.IPlayer):
+class dumberPlayer(iplayer.IPlayer):
 	
 	# here is a dictionary we have, the first keys are the states of the game and the second keys are the moves that can be made from that state and then finally the value of the moves that can be max 100.
 	"""
@@ -34,7 +34,7 @@ class dynamicPlayer(iplayer.IPlayer):
 		# 	[0, 1, 0, 1, 0, 1]
 		# ], dtype=np.int8).reshape(self.SIZE, self.SIZE).T
 	
-	def __init__(self,startFresh:bool = False, seed:int=0,saveFile:str=""):
+	def __init__(self,startFresh:bool = False, seed:int=0):
 		super().__init__()
 		self.seed = seed
 		if startFresh:
@@ -44,10 +44,10 @@ class dynamicPlayer(iplayer.IPlayer):
 			board = Board()
 		else:
 			# we will load the memory array from the file.
-			self.loadTraining(saveFile)
+			self.loadTraining("")
 		
-	def __get_exponent(self, board_int: int, turn_sign: int, start: tuple[int, int], end: tuple[int, int]) -> float:
-		key = (board_int, turn_sign, start, end)
+	def __get_exponent(self, startingPointIntValue: int, turn_sign: int, start: tuple[int, int], end: tuple[int, int]) -> float:
+		key = (startingPointIntValue, turn_sign, start, end)
 		if key not in self.memoryArr:
 			# print("miss")
 			return 1.
@@ -59,16 +59,19 @@ class dynamicPlayer(iplayer.IPlayer):
 				return 1.
 
 	def decide_move(self, board: iplayer.Board) -> tuple[tuple[int, int], tuple[int, int]]:
-		board_int = int(board)
 		turn_sign = board.turn_sign
-		possible_moves: dict[tuple[int, int], tuple[int, int]] = [
-			(
-				self.__get_exponent(board_int, turn_sign, start, end),
-				(start, end)
-			)
-			for start in board.get_possible_pos()
-			for end in board.get_correct_moves(start)
-		]
+		possible_moves: dict[tuple[int, int], tuple[int, int]] = []
+		for start in board.get_possible_pos():
+			startingPointIntValue = board[start]
+			for end in board.get_correct_moves(start):
+				startingPointIntValue = board[start]
+				possible_moves.append(
+					(
+						self.__get_exponent(startingPointIntValue, turn_sign, start, end),
+						(start, end)
+					)
+				)
+		
 
 		exponents, moves = zip(*possible_moves)
 		random.seed(self.seed)
@@ -105,7 +108,9 @@ class dynamicPlayer(iplayer.IPlayer):
 		# we will play the game until it ends:
 		for player in player_order():
 			start,end = player.decide_move(board)
-			movesMade.add((int(board), board.turn_sign, start, end))
+			startingPointIntValue = board[start]
+
+			movesMade.add((startingPointIntValue, board.turn_sign, start, end))
 			board.make_move(start,end)
 			if board.game_state.value != 0:
 				break
@@ -128,30 +133,29 @@ class dynamicPlayer(iplayer.IPlayer):
 	
 	def saveTraining(self, path: str) -> None:
 		path = path or "dynamic_learning_agent"
-		with open(path+".dynamicProgrammingSave", "wb") as f:
+		with open(path+".DUMBdynamicProgrammingSave", "wb") as f:
 			pickle.dump(self.memoryArr, f)
 			
 	def loadTraining(self, path: str) -> bool:
 		path = path or "dynamic_learning_agent"
 		try:
-			with open(path+".dynamicProgrammingSave", "rb") as f:
+			with open(path+".DUMBdynamicProgrammingSave", "rb") as f:
 				self.memoryArr = pickle.load(f)
 			return True
 		except FileNotFoundError:
 			return False
-		
+	
 	@staticmethod
-	def combine(*agents: iplayer.IPlayer) -> 'dynamicPlayer':
-		combined = dynamicPlayer()
+	def combine(*agents: iplayer.IPlayer) -> 'dumberPlayer':
+		combined = dumberPlayer()
 		for agent in agents:
-			assert isinstance(agent, dynamicPlayer)
+			assert isinstance(agent, dumberPlayer)
 			for key, value in agent.memoryArr.items():
 				if key not in combined.memoryArr:
 					combined.memoryArr[key] = 0
 				combined.memoryArr[key] += value
 		return combined
 
-	
 	def __str__(self) -> str:
-		return "Dynamic Learning Agent"
+		return "Dumb Learning Agent"
 	

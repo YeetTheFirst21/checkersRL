@@ -21,6 +21,7 @@ import algo.board
 from algo.board import Board
 import algo.iplayer as iplayer
 import algo.dynamicProgramming as dp
+import algo.dumberProgramming as dpp
 
 
 CUR_DIR = pathlib.Path(__file__).parent.resolve().absolute()
@@ -117,6 +118,7 @@ class UIState:
 		}
 		self.popup_content: str = ""
 		self.training_steps = 50
+		self.seed_input = 0
 
 		self.automatic_computer_step: bool = True
 
@@ -128,8 +130,9 @@ class UIState:
 		self.player_i: dict[int, int] = { 1: 0, -1: 0 }
 		self.players: list[iplayer.IPlayer] = [
 			iplayer.UserInput(),
-			iplayer.RandomPlayer(433),
-			dp.dynamicPlayer()
+			iplayer.RandomPlayer(self.seed_input),
+			dp.dynamicPlayer(self.seed_input),
+			dpp.dumberPlayer(self.seed_input)
 		]
 
 		self.worker_thread_event = threading.Event()
@@ -150,7 +153,10 @@ class UIState:
 		self.selected_pos = None
 		self.board = Board()
 		self.number_of_moves = 0
-		self.players[2].seed = 0
+
+		self.players[1].seed = self.seed_input
+		self.players[2].seed = self.seed_input
+		self.players[3].seed = self.seed_input
 
 	def get_player(self, sign: int) -> iplayer.IPlayer:
 		return self.players[self.player_i[sign]]
@@ -303,6 +309,15 @@ def draw_board(state: UIState, pos: tuple[float, float], available_size: tuple[f
 		imgui.end_popup()
 
 
+# training the players and then combining the memory arrays at the end with combine method:
+def train(steps:int, player: dp.dynamicPlayer, enemy: iplayer.IPlayer):
+	# print(f"Training player")0
+	for i in range(steps):
+		player.do_training_step(enemy, 1)
+		player.do_training_step(enemy, -1)
+	
+	return player
+
 def main():
 	window = __impl_glfw_init()
 	imgui.create_context()
@@ -351,12 +366,32 @@ def main():
 			if imgui.button("Do training step"):
 				for i in range(state.training_steps):
 					#state.players[1].seed = i
-					state.players[2].seed = 0
 					state.players[2].do_training_step(state.players[1], 1)
-					state.players[2].seed = 0
 					state.players[2].do_training_step(state.players[1], -1)
 				
 				state.players[2].saveTraining("")
+
+			if imgui.button("Do training step for dumb"):
+				for i in range(state.training_steps):
+					#state.players[1].seed = i
+					state.players[3].do_training_step(state.players[1], 1)
+					state.players[3].do_training_step(state.players[1], -1)
+				
+				state.players[3].saveTraining("")
+
+			if imgui.button("Do parallel training step for normal"):
+				import concurrent.futures
+				mainPlayer:dp.dynamicPlayer = dp.dynamicPlayer(saveFile="parallel")
+
+				executor = concurrent.futures.ProcessPoolExecutor(max_workers=8)
+
+				Players = [dp.dynamicPlayer(seed=i*2,saveFile="parallel") for i in range(8)]
+
+
+				futures = [executor.submit(train, state.training_steps, Players[i], state.players[1]) for i in range(8)]
+				
+				mainPlayer = dp.dynamicPlayer.combine(*(future.result() for future in futures))
+				mainPlayer.saveTraining("parallel")
 
 			if imgui.button("Reset board"):
 				state.reset_board()
@@ -410,11 +445,8 @@ def main():
 					if changed:
 						state.player_i[i] = new_val
 
-			if isinstance(state.get_player(1), iplayer.RandomPlayer) or \
-					isinstance(state.get_player(-1), iplayer.RandomPlayer):
-				random_player: iplayer.RandomPlayer = state.players[1] # type: ignore
-				imgui.set_next_item_width(imgui.get_content_region_available_width() * 0.4)
-				_, random_player.seed = imgui.input_int("Random player seed", random_player.seed)
+			imgui.set_next_item_width(imgui.get_content_region_available_width() * 0.4)
+			_, state.seed_input = imgui.input_int("Random player seed", state.seed_input)
 			
 			imgui.separator()
 			imgui.text(f"Board hash: {int(state.board)}")

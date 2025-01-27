@@ -23,8 +23,6 @@ class RandomPlayer(IPlayer):
 		self.seed = seed
 
 	def decide_move(self, board: Board) -> tuple[tuple[int, int], tuple[int, int]]:
-		random.seed(self.seed)
-
 		possible_starts = list(board.get_possible_pos())
 		random.shuffle(possible_starts)
 
@@ -33,6 +31,8 @@ class RandomPlayer(IPlayer):
 			if not possible_ends:
 				continue
 			end = random.choice(list(possible_ends))
+
+			self.seed = random.randint(0, 1000000)
 			return start, end
 		
 		raise ValueError("Tried to ask for a move when there are no possible moves")

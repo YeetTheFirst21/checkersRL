@@ -188,7 +188,7 @@ class Board():
 			if (second_last_move[0] == fourth_last_move[1] and second_last_move[1] == fourth_last_move[0] and
 				str(e) == str(fourth_last_move[1]) and str(s) == str(fourth_last_move[0])):
 				# this gets triggered when the same piece does the exact same move the third time, thus we should not allow it.
-				print("repeated move\n")
+				# print("repeated move\n")
 
 				return False
 
