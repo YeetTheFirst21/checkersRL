@@ -7,6 +7,7 @@ from .utils import ImageTexture
 from algo.board import Board, GameState, _s
 from algo import iplayer
 import algo.dynamicProgramming as dp
+import algo.q_learning as ql
 
 class UIState:
 	def __init__(self) -> None:
@@ -32,7 +33,8 @@ class UIState:
 		self.players: list[iplayer.IPlayer] = [
 			iplayer.UserInput(),
 			iplayer.RandomPlayer(),
-			dp.dynamicPlayer()
+			dp.dynamicPlayer(),
+			ql.QLearning()
 		]
 
 		self.worker_thread_event = threading.Event()
