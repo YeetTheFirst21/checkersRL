@@ -13,14 +13,8 @@ class QLearning(iplayer.IPlayer):
 	class DQN(nn.Module):
 		GAMMA = 0.99 # discount rate
 
-		def __init__(self, device):
+		def __init__(self, device, layer_sizes: list[int]):
 			super(QLearning.DQN, self).__init__()
-
-			layer_sizes = [
-				90,
-				20,
-				1
-			]
 
 			layers = []
 			prev_size = layer_sizes[0]
@@ -42,10 +36,14 @@ class QLearning(iplayer.IPlayer):
 		action: tuple[tuple[int, int], tuple[int, int]]
 		value: torch.Tensor
 		
-	def __init__(self, model_path: str = "dqn.pth") -> None:
+	def __init__(self, model_path: str = "dqn.pth", layer_sizes: list[int] = [90, 50, 50, 1]) -> None:
 		super().__init__()
+
+		self.__model_path = model_path
+		self.__layer_sizes = layer_sizes
+
 		self.device = torch.device("cpu")
-		self.model = self.DQN(device=self.device)
+		self.model = self.DQN(device=self.device, layer_sizes=layer_sizes)
 		self.model.load_state_dict(torch.load(model_path))
 	
 	def decide_move(self, board: Board) -> tuple[tuple[int, int], tuple[int, int]]:
@@ -57,3 +55,6 @@ class QLearning(iplayer.IPlayer):
 				value = self.model(next_state) * self.DQN.GAMMA + immediate_reward
 				ret.append(QLearning.Action((s, e), value))
 		return max(ret, key=lambda x: x.value.item()).action
+
+	def __str__(self) -> str:
+		return f"DQN {self.__layer_sizes} {self.__model_path}"
