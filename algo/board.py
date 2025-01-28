@@ -1,3 +1,4 @@
+import torch
 import numpy as np
 
 from typing import Optional, Iterator
@@ -86,6 +87,7 @@ class Board():
 		self.__moves_since_last_capture = 0
 
 		self.__correct_moves_cache: dict[_c, dict[_c, bool]] = {}
+		self.__tensor_cache: Optional[torch.Tensor] = None
 
 		self.__turn_sign = 1
 		self.__game_state_cache: Optional[GameState] = GameState.NOT_OVER
@@ -241,12 +243,15 @@ class Board():
 	def __invalidate_cache(self) -> None:
 		self.__correct_moves_cache.clear()
 		self.__game_state_cache = None
+		self.__tensor_cache = None
 
-	def make_move(self, start: tuple[int, int], end: tuple[int, int]) -> None:
+	def make_move(self, start: tuple[int, int], end: tuple[int, int]) -> int:
 		"""
 		**Warning**: No checks are performed and no turn change is made!
 
 		Would update the board state, check if the piece should be promoted or capture again
+
+		Returns: sign of the player who captured a piece or 0 if no capture was made
 		"""
 
 		had_to_capture = self.check_should_capture(self.__turn_sign)
@@ -255,12 +260,15 @@ class Board():
 
 		piece = self.__board[start]
 
+		ret = 0
+
 		if had_to_capture:
 			# We should determine the enemy and capture
 			s = _c(*start)
 			enemy_pos = s + (_c(*end) - s).s()
 			assert self.__enemy(s, enemy_pos)
 			self.__board[enemy_pos.x, enemy_pos.y] = 0
+			ret = self.turn_sign
 
 			self.__moves_since_last_capture = 0
 		else:
@@ -284,10 +292,11 @@ class Board():
 		#    If we should and can capture with the same piece, we should not change the turn
 		if had_to_capture and self.check_should_capture(self.__turn_sign) and \
 				next(self.get_correct_moves(end), None):
-			return
+			return ret
 		
 		# 	Otherwise, change the turn
 		self.__turn_sign = -self.__turn_sign
+		return ret
 
 	@property
 	def game_state(self) -> GameState:
@@ -385,6 +394,26 @@ class Board():
 			self.__enable_update_should_capture,
 			self.__moves_since_last_capture,
 		]) + self.__bare_byte_repr()
+	
+	def __iter__(self) -> Iterator[tuple[tuple[int, int], int]]:
+		"""
+		Returns pair pos and piece
+		"""
+		pos = _c(0, 0)
+		for i in range(18):
+			yield pos.tuple(), self[pos]
+			pos = self.__faster_iteration_end(pos, i)
+
+	def to_tensor(self, device) -> torch.Tensor:
+		if self.__tensor_cache is not None:
+			return self.__tensor_cache.clone()
+		
+		self.__tensor_cache = torch.zeros(90, dtype=torch.float32, device=device)
+		for (x, y), piece in self:
+			#       possition coding                   piece coding
+			index = ((x + self.SIZE * y) // 2) * 5 + (piece + 2)
+			self.__tensor_cache[index] = 1
+		return self.__tensor_cache.clone()
 	
 	@classmethod
 	def from_num_repr(cls, value: int | bytes) -> 'Board':
