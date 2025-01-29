@@ -62,6 +62,9 @@ class Board():
 		_c(1, 1),
 		_c(-1, 1)
 	]
+
+	previousMoves = []
+
 	
 	def __init__(self) -> None:
 		self.__board: np.ndarray[tuple[int, int], np.dtype[np.int8]] = np.array([
@@ -191,6 +194,17 @@ class Board():
 		return False
 	
 	def __is_move_correct(self, s: _c, e: _c) -> bool:
+		# Check if the move is repeated
+		if len(self.previousMoves) >= 8:
+			second_last_move = self.previousMoves[-2]
+			fourth_last_move = self.previousMoves[-4]
+			if (second_last_move[0] == fourth_last_move[1] and second_last_move[1] == fourth_last_move[0] and
+				str(e) == str(fourth_last_move[1]) and str(s) == str(fourth_last_move[0])):
+				# this gets triggered when the same piece does the exact same move the third time, thus we should not allow it.
+				# print("repeated move\n")
+
+				return False
+
 		if s in self.__correct_moves_cache and e in self.__correct_moves_cache[s]:
 			return self.__correct_moves_cache[s][e]
 	
@@ -287,6 +301,9 @@ class Board():
 		# Check if the piece should capture again
 		if self.__enable_update_should_capture:
 			self.__update_should_capture()
+
+		self.previousMoves.append((start, end))
+
 
 		# Change the turn
 		#    If we should and can capture with the same piece, we should not change the turn
