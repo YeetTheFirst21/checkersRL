@@ -87,7 +87,7 @@ class Board():
 		self.__moves_since_last_capture = 0
 
 		self.__correct_moves_cache: dict[_c, dict[_c, bool]] = {}
-		self.__tensor_cache: Optional[torch.Tensor] = None
+		self.__tensor_cache: dict[tuple[bool, bool], torch.Tensor] = {}
 
 		self.__turn_sign = 1
 		self.__game_state_cache: Optional[GameState] = GameState.NOT_OVER
@@ -243,7 +243,7 @@ class Board():
 	def __invalidate_cache(self) -> None:
 		self.__correct_moves_cache.clear()
 		self.__game_state_cache = None
-		self.__tensor_cache = None
+		self.__tensor_cache.clear()
 
 	def make_move(self, start: tuple[int, int], end: tuple[int, int]) -> int:
 		"""
@@ -404,16 +404,41 @@ class Board():
 			yield pos.tuple(), self[pos]
 			pos = self.__faster_iteration_end(pos, i)
 
-	def to_tensor(self, device) -> torch.Tensor:
-		if self.__tensor_cache is not None:
-			return self.__tensor_cache.clone()
+	def to_tensor(self, device, flipped = False) -> torch.Tensor:
+		cache_index = (flipped, False)
+		if cache_index in self.__tensor_cache:
+			return self.__tensor_cache[cache_index].clone()
 		
-		self.__tensor_cache = torch.zeros(90, dtype=torch.float32, device=device)
-		for (x, y), piece in self:
+		self.__tensor_cache[cache_index] = torch.zeros(90, dtype=torch.float32, device=device)
+
+		board = self.__board
+		if flipped:
+			board = -board.T
+		
+		pos = _c(0, 0)
+		for i in range(18):
 			#       possition coding                   piece coding
-			index = ((x + self.SIZE * y) // 2) * 5 + (piece + 2)
-			self.__tensor_cache[index] = 1
-		return self.__tensor_cache.clone()
+			index = ((pos.x + self.SIZE * pos.y) // 2) * 5 + (board[pos.x, pos.y] + 2)
+			self.__tensor_cache[cache_index][index] = 1
+			pos = self.__faster_iteration_end(pos, i)
+		return self.__tensor_cache[cache_index].clone()
+	
+	def to_tensor3d(self, device, flipped = False) -> torch.Tensor:
+		cache_index = (flipped, False)
+		if cache_index in self.__tensor_cache:
+			return self.__tensor_cache[cache_index].clone()
+		
+		self.__tensor_cache[cache_index] = torch.zeros(3, 6, 5, dtype=torch.float32, device=device)
+
+		board = self.__board
+		if flipped:
+			board = -board.T
+		
+		pos = _c(0, 0)
+		for i in range(18):
+			self.__tensor_cache[cache_index][pos.x // 2][pos.y][board[pos.x, pos.y] + 2] = 1
+			pos = self.__faster_iteration_end(pos, i)
+		return self.__tensor_cache[cache_index].clone()
 	
 	@classmethod
 	def from_num_repr(cls, value: int | bytes) -> 'Board':
