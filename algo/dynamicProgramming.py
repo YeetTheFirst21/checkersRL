@@ -2,7 +2,6 @@ from . import iplayer
 
 import math
 from .board import Board, _s
-import numpy as np
 
 import pickle
 

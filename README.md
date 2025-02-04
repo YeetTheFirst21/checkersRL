@@ -1,6 +1,6 @@
 # romaAI
 RL to play American checkers;
-The used stack is Python (3.10+) + pyimgui(imgui[glfw]) + NumPy
+The used stack is Python (3.10+) + pyimgui(imgui[glfw]) + Torch2.5
 
 #### The rules of American checkers ([YT video](https://youtu.be/ScKIdStgAfU)) ([a better rule source](https://checkers.online/magazine/game/american-checkers-rules)):
 1. Board size is 6x6
@@ -13,7 +13,7 @@ The used stack is Python (3.10+) + pyimgui(imgui[glfw]) + NumPy
 8. TODO: this rule should probably be cancelled. Kings can move and capture diagonally in all directions ONE STEP <- that's a small rule update from [here](https://checkers.online/magazine/game/american-checkers-rules#:~:text=A%20king%20in,backward%20one%20square)
 
 #### Implementation details:
-Board is represented as a 6x6 NumPy array, where
+Board could be represented as a 6x6 NumPy array, where
 * `2` - king positive checker
 * `1` - simple positive checker
 * `0` - empty square

@@ -1,13 +1,17 @@
 import torch
-import numpy as np
 
 from typing import Optional, Iterator
 from dataclasses import dataclass
 from enum import Enum
 import itertools
+import copy
 
 def _s(x: int) -> int:
-	return int(np.sign(x))
+	if x > 0:
+		return 1
+	elif x < 0:
+		return -1
+	return 0
 
 @dataclass
 class _c:
@@ -51,6 +55,11 @@ class GameState(Enum):
 
 	def __str__(self) -> str:
 		return self.name
+	
+@dataclass
+class MoveResult:
+	captured: int
+	promoted: bool
 
 class Board():
 	SIZE = 6
@@ -64,30 +73,22 @@ class Board():
 	]
 	
 	def __init__(self) -> None:
-		self.__board: np.ndarray[tuple[int, int], np.dtype[np.int8]] = np.array([
+		# https://stackoverflow.com/a/6473724/8302811
+		self.__board: list[list[int]] = list(map(list, zip(*[
 			[-1, 0, -1, 0, -1, 0],
 			[0, -1, 0, -1, 0, -1],
 			[0, 0, 0, 0, 0, 0],
 			[0, 0, 0, 0, 0, 0],
 			[1, 0, 1, 0, 1, 0],
 			[0, 1, 0, 1, 0, 1]
-		], dtype=np.int8).reshape(self.SIZE, self.SIZE).T
-
-		# self.__board: np.ndarray[tuple[int, int], np.dtype[np.int8]] = np.array([
-		# 	[-1, 0, -1, 0, -1, 0],
-		# 	[0, 0, 0, 0, 0, 0],
-		# 	[0, 0, 0, 0, 0, 0],
-		# 	[0, -1, 0, -1, 0, 0],
-		# 	[1, 0, 2, 0, 2, 0],
-		# 	[0, 1, 0, 1, 0, 1]
-		# ], dtype=np.int8).reshape(self.SIZE, self.SIZE).T
+		])))
 
 		self.__should_capture = {1: False, -1: False}
 		self.__enable_update_should_capture = True
 		self.__moves_since_last_capture = 0
 
 		self.__correct_moves_cache: dict[_c, dict[_c, bool]] = {}
-		self.__tensor_cache: Optional[torch.Tensor] = None
+		self.__tensor_cache: dict[tuple[bool, bool], torch.Tensor] = {}
 
 		self.__turn_sign = 1
 		self.__game_state_cache: Optional[GameState] = GameState.NOT_OVER
@@ -243,46 +244,48 @@ class Board():
 	def __invalidate_cache(self) -> None:
 		self.__correct_moves_cache.clear()
 		self.__game_state_cache = None
-		self.__tensor_cache = None
+		self.__tensor_cache.clear()
 
-	def make_move(self, start: tuple[int, int], end: tuple[int, int]) -> int:
+	def make_move(self, start: tuple[int, int], end: tuple[int, int]) -> MoveResult:
 		"""
 		**Warning**: No checks are performed and no turn change is made!
 
 		Would update the board state, check if the piece should be promoted or capture again
 
-		Returns: sign of the player who captured a piece or 0 if no capture was made
+		Returns: 2 if king was captured, 1 if simple piece was captured, 0 otherwise
 		"""
 
 		had_to_capture = self.check_should_capture(self.__turn_sign)
 		
 		self.__invalidate_cache()
 
-		piece = self.__board[start]
+		piece = self[start]
 
-		ret = 0
+		ret = MoveResult(0, False)
 
 		if had_to_capture:
 			# We should determine the enemy and capture
 			s = _c(*start)
 			enemy_pos = s + (_c(*end) - s).s()
 			assert self.__enemy(s, enemy_pos)
-			self.__board[enemy_pos.x, enemy_pos.y] = 0
-			ret = self.turn_sign
+			ret.captured = abs(self.__board[enemy_pos.x][enemy_pos.y])
+			self.__board[enemy_pos.x][enemy_pos.y] = 0
 
 			self.__moves_since_last_capture = 0
 		else:
 			self.__moves_since_last_capture += 1
 
 		# Move our piece
-		self.__board[end] = piece
-		self.__board[start] = 0
+		self.__board[end[0]][end[1]] = piece
+		self.__board[start[0]][start[1]] = 0
 
 		# Check if the piece should be promoted
-		if end[1] == 0 and self.__board[end] == 1:
-			self.__board[end] = 2
-		elif end[1] == self.SIZE - 1 and self.__board[end] == -1:
-			self.__board[end] = -2
+		if end[1] == 0 and self[end] == 1:
+			self.__board[end[0]][end[1]] = 2
+			ret.promoted = True
+		elif end[1] == self.SIZE - 1 and self[end] == -1:
+			self.__board[end[0]][end[1]] = -2
+			ret.promoted = True
 		
 		# Check if the piece should capture again
 		if self.__enable_update_should_capture:
@@ -336,11 +339,11 @@ class Board():
 		return GameState(-turn_sign)
 
 	def __getitem__(self, pos: _c | tuple[int, int]) -> int:
-		return self.__board[pos[0], pos[1]]
+		return self.__board[pos[0]][pos[1]]
 
 	@property
-	def board(self) -> np.ndarray[tuple[int, int], np.dtype[np.int8]]:
-		return self.__board.copy()
+	def board(self) -> list[list[int]]:
+		return copy.deepcopy(self.__board)
 
 	def is_valid_pos(self, pos: tuple[int, int]) -> bool:
 		return pos[0] in range(self.SIZE) and pos[1] in range(self.SIZE) and (pos[0] + pos[1]) % 2 == self.TILING_PARITY
@@ -404,16 +407,54 @@ class Board():
 			yield pos.tuple(), self[pos]
 			pos = self.__faster_iteration_end(pos, i)
 
-	def to_tensor(self, device) -> torch.Tensor:
-		if self.__tensor_cache is not None:
-			return self.__tensor_cache.clone()
+	
+	@staticmethod
+	def __flip_board(board: list[list[int]]) -> list[list[int]]:
+		# https://stackoverflow.com/a/6473742/8302811
+		s = Board.SIZE - 1
+		return [
+			[
+				-board[s - x][s - y]
+				for y in range(Board.SIZE)
+			]
+			for x in range(Board.SIZE)
+		]
+
+	def to_tensor(self, device, flipped = False) -> torch.Tensor:
+		cache_index = (flipped, False)
+		if cache_index in self.__tensor_cache:
+			return self.__tensor_cache[cache_index].clone()
 		
-		self.__tensor_cache = torch.zeros(90, dtype=torch.float32, device=device)
-		for (x, y), piece in self:
+		self.__tensor_cache[cache_index] = torch.zeros(90, dtype=torch.float32, device=device)
+
+		board = self.__board
+		if flipped:
+			board = self.__flip_board(board)
+		
+		pos = _c(0, 0)
+		for i in range(18):
 			#       possition coding                   piece coding
-			index = ((x + self.SIZE * y) // 2) * 5 + (piece + 2)
-			self.__tensor_cache[index] = 1
-		return self.__tensor_cache.clone()
+			index = ((pos.x + self.SIZE * pos.y) // 2) * 5 + (board[pos.x][pos.y] + 2)
+			self.__tensor_cache[cache_index][index] = 1
+			pos = self.__faster_iteration_end(pos, i)
+		return self.__tensor_cache[cache_index].clone()
+	
+	def to_tensor3d(self, device, flipped = False) -> torch.Tensor:
+		cache_index = (flipped, True)
+		if cache_index in self.__tensor_cache:
+			return self.__tensor_cache[cache_index].clone()
+		
+		self.__tensor_cache[cache_index] = torch.zeros(3, 6, 5, dtype=torch.float32, device=device)
+
+		board = self.__board
+		if flipped:
+			board = self.__flip_board(board)
+		
+		pos = _c(0, 0)
+		for i in range(18):
+			self.__tensor_cache[cache_index][pos.x // 2][pos.y][board[pos.x][pos.y] + 2] = 1
+			pos = self.__faster_iteration_end(pos, i)
+		return self.__tensor_cache[cache_index].clone()
 	
 	@classmethod
 	def from_num_repr(cls, value: int | bytes) -> 'Board':
@@ -434,7 +475,7 @@ class Board():
 
 		pos = _c(0, 0)
 		for i in range(18):
-			ret.__board[pos.x, pos.y] = arr[i + 3] - 2
+			ret.__board[pos.x][pos.y] = arr[i + 3] - 2
 			pos = cls.__faster_iteration_end(pos, i)
 
 		return ret
