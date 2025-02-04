@@ -55,6 +55,11 @@ class GameState(Enum):
 
 	def __str__(self) -> str:
 		return self.name
+	
+@dataclass
+class MoveResult:
+	captured: int
+	promoted: bool
 
 class Board():
 	SIZE = 6
@@ -241,13 +246,13 @@ class Board():
 		self.__game_state_cache = None
 		self.__tensor_cache.clear()
 
-	def make_move(self, start: tuple[int, int], end: tuple[int, int]) -> int:
+	def make_move(self, start: tuple[int, int], end: tuple[int, int]) -> MoveResult:
 		"""
 		**Warning**: No checks are performed and no turn change is made!
 
 		Would update the board state, check if the piece should be promoted or capture again
 
-		Returns: sign of the player who captured a piece or 0 if no capture was made
+		Returns: 2 if king was captured, 1 if simple piece was captured, 0 otherwise
 		"""
 
 		had_to_capture = self.check_should_capture(self.__turn_sign)
@@ -256,15 +261,15 @@ class Board():
 
 		piece = self[start]
 
-		ret = 0
+		ret = MoveResult(0, False)
 
 		if had_to_capture:
 			# We should determine the enemy and capture
 			s = _c(*start)
 			enemy_pos = s + (_c(*end) - s).s()
 			assert self.__enemy(s, enemy_pos)
+			ret.captured = abs(self.__board[enemy_pos.x][enemy_pos.y])
 			self.__board[enemy_pos.x][enemy_pos.y] = 0
-			ret = self.turn_sign
 
 			self.__moves_since_last_capture = 0
 		else:
@@ -277,8 +282,10 @@ class Board():
 		# Check if the piece should be promoted
 		if end[1] == 0 and self[end] == 1:
 			self.__board[end[0]][end[1]] = 2
+			ret.promoted = True
 		elif end[1] == self.SIZE - 1 and self[end] == -1:
 			self.__board[end[0]][end[1]] = -2
+			ret.promoted = True
 		
 		# Check if the piece should capture again
 		if self.__enable_update_should_capture:
@@ -404,9 +411,13 @@ class Board():
 	@staticmethod
 	def __flip_board(board: list[list[int]]) -> list[list[int]]:
 		# https://stackoverflow.com/a/6473742/8302811
+		s = Board.SIZE - 1
 		return [
-			list(-el for el in row)
-			for row in zip(*board)
+			[
+				-board[s - x][s - y]
+				for y in range(Board.SIZE)
+			]
+			for x in range(Board.SIZE)
 		]
 
 	def to_tensor(self, device, flipped = False) -> torch.Tensor:
@@ -429,7 +440,7 @@ class Board():
 		return self.__tensor_cache[cache_index].clone()
 	
 	def to_tensor3d(self, device, flipped = False) -> torch.Tensor:
-		cache_index = (flipped, False)
+		cache_index = (flipped, True)
 		if cache_index in self.__tensor_cache:
 			return self.__tensor_cache[cache_index].clone()
 		

@@ -9,6 +9,7 @@ from algo.board import Board, GameState, _s
 from algo import iplayer
 import algo.dynamicProgramming as dp
 import algo.q_learning as ql
+import algo.ddq_learning as ddqn
 
 class UIState:
 	def __init__(self) -> None:
@@ -37,12 +38,16 @@ class UIState:
 			dp.dynamicPlayer(),
 			ql.QLearning("dqn.pth"),
 			ql.QLearning("dqn80.pth"),
-			ql.QLearning("90_52_1_9130.pth", [90, 52, 1]),
 			ql.QLearning("~dqn83 90 50 20 1.pth", [90, 50, 20, 1]),
 			ql.QLearning("~dqn75 90 100 90 20 1.pth", [90, 100, 90, 20, 1]),
+			ql.QLearning("90_52_1_8749, 10000  miracle3 percentdqn.pth", [90, 52, 1]),
+			ql.QLearning("90_52_1_89  miracle2 percentdqn.pth", [90, 52, 1]),
 			ql.QLearning("90_52_1_9130.pth", [90, 52, 1]),
 			ql.QLearning("dqn86 90 50 50 1.pth", [90, 50, 50, 1]),
 			ql.QLearning("~dqn86 90 50 50 1 tuned on Yeet.pth", [90, 50, 50, 1]),
+			ddqn.QLearning("ddqn87 90 50 50 1 q_1 tuned on ddqn86.pth", [90, 50, 50, 1]),
+			ddqn.QLearning("ddqn86 90 50 50 1 q_2 tuned on ddqn86.pth", [90, 50, 50, 1]),
+			ddqn.QLearning("ddqn85 90 50 50 1 q_2 tuned on dqn86.pth based on ddqn87.pth", [90, 50, 50, 1]),
 		]
 
 		self.worker_thread_event = threading.Event()
