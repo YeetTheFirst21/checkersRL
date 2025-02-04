@@ -51,7 +51,7 @@ class QLearning(iplayer.IPlayer):
 		for s in board.get_possible_pos():
 			for e in board.get_correct_moves(s):
 				next_state = copy.deepcopy(board)
-				immediate_reward = torch.tensor([next_state.make_move(s, e) * next_state.turn_sign], device=self.device)
+				immediate_reward = torch.tensor([bool(next_state.make_move(s, e).captured) * next_state.turn_sign], device=self.device)
 				value = self.model(next_state) * self.DQN.GAMMA + immediate_reward
 				ret.append(QLearning.Action((s, e), value))
 		return max(ret, key=lambda x: x.value.item()).action
