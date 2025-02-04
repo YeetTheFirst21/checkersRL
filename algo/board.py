@@ -411,9 +411,13 @@ class Board():
 	@staticmethod
 	def __flip_board(board: list[list[int]]) -> list[list[int]]:
 		# https://stackoverflow.com/a/6473742/8302811
+		s = Board.SIZE - 1
 		return [
-			list(-el for el in row)
-			for row in zip(*board)
+			[
+				-board[s - x][s - y]
+				for y in range(Board.SIZE)
+			]
+			for x in range(Board.SIZE)
 		]
 
 	def to_tensor(self, device, flipped = False) -> torch.Tensor:
@@ -436,7 +440,7 @@ class Board():
 		return self.__tensor_cache[cache_index].clone()
 	
 	def to_tensor3d(self, device, flipped = False) -> torch.Tensor:
-		cache_index = (flipped, False)
+		cache_index = (flipped, True)
 		if cache_index in self.__tensor_cache:
 			return self.__tensor_cache[cache_index].clone()
 		
