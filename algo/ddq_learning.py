@@ -3,6 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 import copy
+import pathlib
 from dataclasses import dataclass
 
 from . import iplayer
@@ -74,6 +75,7 @@ class QLearning(iplayer.IPlayer):
 
 		self.__model_path = model_path
 		self.__layer_sizes = layer_sizes
+		self.__model_file_name = pathlib.Path(model_path).name
 
 		self.device = torch.device("cpu")
 		self.model = self.DQN(device=self.device, layer_sizes=layer_sizes)
@@ -101,4 +103,4 @@ class QLearning(iplayer.IPlayer):
 		return max(ret, key=lambda x: x.value.item()).action
 
 	def __str__(self) -> str:
-		return f"DDQN {self.__layer_sizes} {self.__model_path}"
+		return f"{self.__model_file_name} ({self.__layer_sizes})"

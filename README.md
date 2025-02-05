@@ -1,18 +1,52 @@
-# romaAI
-RL to play American checkers;
-The used stack is Python (3.10+) + pyimgui(imgui[glfw]) + Torch2.5
+# checkersRL
+Using Reinforcement Learning to play American checkers
 
-#### The rules of American checkers ([YT video](https://youtu.be/ScKIdStgAfU)) ([a better rule source](https://checkers.online/magazine/game/american-checkers-rules)):
+The used stack is `Python (3.10+)` + `pyimgui(imgui[glfw])` + `Torch2.5`
+
+![](./ui_preview.png)
+
+## Results
+Reported results of 50k games with agent being the negative player against the positive random bot:
+
+| # | Agent Name | Win Rate (%) |
+|---|------------|--------------|
+| 1 | `DQN 90_50_50_1` | $76.908$ |
+| 2 | `DQN 90_50_20_1` | $59.670$ |
+| 3 | `DQN 90_50_50_1` | $77.732$ |
+| **4** | **`DQN 90_50_50_1 t.g. #3`** | $\mathbf{84.448}$ |
+| 5 | `DQN 90_52_1` | $78.628$ |
+| 0 | `Random Bot` | $50.028$ |
+
+Additional results from using [Double Deep Q-learning](https://github.com/fschur/DDQN-with-PyTorch-for-OpenAI-Gym/) in the same setting:
+| # | Agent Name | Win Rate (%) |
+|---|------------|--------------|
+| 6 | `DDQN 90_50_50_1 q_1` | $80.352$ |
+| **7** | **`DDQN 90_50_50_1 q_2`** | $\mathbf{87.564}$ |
+| 8 | `DDQN 90_50_50_1 q_2 t.g. #7` | $87.514$ |
+
+## Running the code
+First install the packages required by the stack:
+```bash
+pip install -r requirements.txt
+```
+
+Then run the code:
+```bash
+python gui.py
+```
+
+## The rules of American checkers ([YT video](https://youtu.be/ScKIdStgAfU)) ([a text rule source](https://checkers.online/magazine/game/american-checkers-rules)):
 1. Board size is 6x6
-2. Light colored square in the right bottom corner
+2. Brown-colored squares start in the bottom right corner
 3. Checkers are placed on the dark squares
 4. The game goes until one of the players has no more moves
 5. Simple checkers can only move forward diagonally one step
-6. All possible captures must be made during the turn
+6. If, after a capture, the same piece can be captured again, it must do so
 7. If a checker reaches the opposite side of the board, it becomes a king
-8. TODO: this rule should probably be cancelled. Kings can move and capture diagonally in all directions ONE STEP <- that's a small rule update from [here](https://checkers.online/magazine/game/american-checkers-rules#:~:text=A%20king%20in,backward%20one%20square)
+8. Kings can move and capture diagonally in all directions in only one step
+9. We have decided that after 50 moves of not capturing any pieces, we should tie the game, or else the game can go on forever.
 
-#### Implementation details:
+## Implementation details:
 Board could be represented as a 6x6 NumPy array, where
 * `2` - king positive checker
 * `1` - simple positive checker
@@ -20,14 +54,14 @@ Board could be represented as a 6x6 NumPy array, where
 * `-1` - simple negative checker
 * `-2` - king negative checker
 ```python
-self.board = np.array([
+self.__board: list[list[int]] = list(map(list, zip(*[
 	[-1, 0, -1, 0, -1, 0],
 	[0, -1, 0, -1, 0, -1],
 	[0, 0, 0, 0, 0, 0],
 	[0, 0, 0, 0, 0, 0],
 	[1, 0, 1, 0, 1, 0],
 	[0, 1, 0, 1, 0, 1]
-]).T
+])))
 ```
 
 Agent uses `self.board` and `self.turn_sign`.
@@ -54,13 +88,3 @@ https://marketplace.visualstudio.com/items?itemName=ktnrg45.vscode-cython
 * `Board[(x, y)]` - magic that returns the value of the board at the position `(x, y)`
 * `int(Board)` - magic method that returns the integer representation of the board. It could be used to store compressed board class representation or for hashing
 * `Board.from_num_repr(int | bytes)` - static method that creates a board from an number representation
-
-## Documenting different approaches
-### Brute force
-After running the state discovery code for 7.5m the amount of discovered states went over 1.01e6, taking up around 90MB of RAM while running in one thread.
-
-An approximate estimation of number of possible states (not taking into account the lower number of pieces is compensated by taking into account the unreachable states):
-
-$$\displaystyle \frac{18!}{12!\cdot6!}\cdot2^{12}\approx76\cdot10^6$$
-
-It gives an estimation that the memory and time usage should be increased by around 70x just to enumerate all the states. This is not feasible, thus the brute force approach is not applicable.

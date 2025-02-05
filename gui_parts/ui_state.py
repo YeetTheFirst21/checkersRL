@@ -31,23 +31,22 @@ class UIState:
 			set[tuple[int, int]]
 		]] = None
 
-		self.player_i: dict[int, int] = { 1: 0, -1: 1 }
+		self.player_i: dict[int, int] = { 1: 0, -1: 6 }
 		self.players: list[iplayer.IPlayer] = [
 			iplayer.UserInput(),
 			iplayer.RandomPlayer(),
 			dp.dynamicPlayer(),
-			ql.QLearning("dqn.pth"),
-			ql.QLearning("dqn80.pth"),
-			ql.QLearning("~dqn83 90 50 20 1.pth", [90, 50, 20, 1]),
-			ql.QLearning("~dqn75 90 100 90 20 1.pth", [90, 100, 90, 20, 1]),
-			ql.QLearning("90_52_1_8749, 10000  miracle3 percentdqn.pth", [90, 52, 1]),
-			ql.QLearning("90_52_1_89  miracle2 percentdqn.pth", [90, 52, 1]),
-			ql.QLearning("90_52_1_9130.pth", [90, 52, 1]),
-			ql.QLearning("dqn86 90 50 50 1.pth", [90, 50, 50, 1]),
-			ql.QLearning("~dqn86 90 50 50 1 tuned on Yeet.pth", [90, 50, 50, 1]),
-			ddqn.QLearning("ddqn87 90 50 50 1 q_1 tuned on ddqn86.pth", [90, 50, 50, 1]),
-			ddqn.QLearning("ddqn86 90 50 50 1 q_2 tuned on ddqn86.pth", [90, 50, 50, 1]),
-			ddqn.QLearning("ddqn85 90 50 50 1 q_2 tuned on dqn86.pth based on ddqn87.pth", [90, 50, 50, 1]),
+			ql.QLearning(str(ROOT_DIR / "models/#1 DQN 90_50_50_1 76.908%.pth")),
+			ql.QLearning(str(ROOT_DIR / "models/#2 DQN 90_50_20_1 59.670%.pth"), [90, 50, 20, 1]),
+			ql.QLearning(str(ROOT_DIR / "models/#3 DQN 90_50_50_1 77.732%.pth")),
+			ql.QLearning(str(ROOT_DIR / "models/#4 DQN 90_50_50_1 t.g. #3 84.448%.pth")),
+			ql.QLearning(str(ROOT_DIR / "models/#5 DQN 90_52_1 78.628%.pth"), [90, 52, 1]),
+			ql.QLearning(str(ROOT_DIR / "models/dqn_y87_90_52_1.pth"), [90, 52, 1]),
+			ql.QLearning(str(ROOT_DIR / "models/dqn_y89_90_52_1.pth"), [90, 52, 1]),
+			ql.QLearning(str(ROOT_DIR / "models/dqn_y99_90_52_1.pth"), [90, 52, 1]),
+			ddqn.QLearning(str(ROOT_DIR / "models/ddqn87 90 50 50 1 q_1 tuned on ddqn86.pth"), [90, 50, 50, 1]),
+			ddqn.QLearning(str(ROOT_DIR / "models/ddqn86 90 50 50 1 q_2 tuned on ddqn86.pth"), [90, 50, 50, 1]),
+			ddqn.QLearning(str(ROOT_DIR / "models/ddqn85 90 50 50 1 q_2 tuned on dqn86.pth based on ddqn87.pth"), [90, 50, 50, 1]),
 		]
 
 		self.worker_thread_event = threading.Event()
@@ -73,7 +72,7 @@ class UIState:
 		return self.players[self.player_i[sign]]
 
 	def get_player_list_name(self, index: int) -> str:
-		return f"{index+1}. {self.players[index]}"
+		return f"{self.players[index]}"
 
 	@property
 	def game_is_going(self) -> bool:
